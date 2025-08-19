@@ -16,7 +16,7 @@
 
 -- Hotel Chain - Reservations and Sales Data Generation Script
 -- This script generates 15,000+ reservation records and associated data
--- Optimized for Snowflake Data Cloud
+-- Multi-Dataset Structure: SYNTHETIC_DATA.HOTEL_CHAIN.HOTEL_CHAIN_*
 
 USE DATABASE SYNTHETIC_DATA;
 USE SCHEMA HOTEL_CHAIN;
@@ -110,13 +110,13 @@ SELECT
     FALSE, -- event_impact (will be updated for specific dates)
     CURRENT_TIMESTAMP()
     
-FROM HOTELS h
-CROSS JOIN ROOM_TYPES rt
+FROM HOTEL_CHAIN_HOTELS h
+CROSS JOIN HOTEL_CHAIN_ROOM_TYPES rt
 CROSS JOIN (
     SELECT DATEADD(day, seq4() - 1, '2024-01-01') as date_value
     FROM TABLE(GENERATOR(ROWCOUNT => 365))
 ) d
-LEFT JOIN HOTEL_ROOM_INVENTORY hri ON h.HOTEL_ID = hri.HOTEL_ID AND rt.ROOM_TYPE_ID = hri.ROOM_TYPE_ID
+LEFT JOIN HOTEL_CHAIN_ROOM_INVENTORY hri ON h.HOTEL_ID = hri.HOTEL_ID AND rt.ROOM_TYPE_ID = hri.ROOM_TYPE_ID
 WHERE hri.ROOM_COUNT > 0;
 
 -- Update rates for corporate discounts
@@ -136,7 +136,7 @@ SELECT
     SEASONAL_FACTOR,
     EVENT_IMPACT,
     CURRENT_TIMESTAMP()
-FROM DAILY_ROOM_RATES 
+FROM HOTEL_CHAIN_DAILY_ROOM_RATES 
 WHERE RATE_CODE = 'BAR'
 AND ABS(RANDOM()) % 10 <= 6; -- 70% of hotels offer corporate rates
 
@@ -153,23 +153,14 @@ WITH reservation_base AS (
     DATEADD(day, -(ABS(RANDOM()) % 120 + 1), DATEADD(day, ABS(RANDOM()) % 455 - 90, CURRENT_DATE())) as BOOKING_DATE,
     ROW_NUMBER() OVER (ORDER BY ABS(RANDOM())) as rn
   FROM TABLE(GENERATOR(ROWCOUNT => 15000)) g
-  JOIN HOTELS h ON h.HOTEL_ID = (
-    SELECT HOTEL_ID FROM HOTELS ORDER BY ABS(RANDOM()) LIMIT 1 OFFSET (ABS(RANDOM()) % 25)
-  )
-  JOIN CUSTOMERS c ON c.CUSTOMER_ID = (
-    SELECT CUSTOMER_ID FROM CUSTOMERS ORDER BY ABS(RANDOM()) LIMIT 1 OFFSET (ABS(RANDOM()) % 5000)
-  )
-  LEFT JOIN CORPORATE_ACCOUNTS corp ON corp.ACCOUNT_ID = (
-    CASE WHEN ABS(RANDOM()) % 10 <= 2 THEN
-      (SELECT ACCOUNT_ID FROM CORPORATE_ACCOUNTS ORDER BY ABS(RANDOM()) LIMIT 1 OFFSET (ABS(RANDOM()) % 10))
-    ELSE NULL END
-  )
-  JOIN ROOM_TYPES rt ON rt.ROOM_TYPE_ID = (
-    SELECT ROOM_TYPE_ID FROM ROOM_TYPES WHERE ROOM_TYPE_ID NOT IN ('RT009', 'RT010') 
-    ORDER BY ABS(RANDOM()) LIMIT 1 OFFSET (ABS(RANDOM()) % 8)
-  )
+  CROSS JOIN HOTEL_CHAIN_HOTELS h
+  CROSS JOIN HOTEL_CHAIN_CUSTOMERS c  
+  LEFT JOIN HOTEL_CHAIN_CORPORATE_ACCOUNTS corp ON ABS(RANDOM()) % 10 <= 2
+  CROSS JOIN HOTEL_CHAIN_ROOM_TYPES rt
+  WHERE rt.ROOM_TYPE_ID NOT IN ('RT009', 'RT010')
+  QUALIFY ROW_NUMBER() OVER (ORDER BY ABS(RANDOM())) <= 15000
 )
-INSERT INTO RESERVATIONS
+INSERT INTO HOTEL_CHAIN_RESERVATIONS
 SELECT 
     'RES' || LPAD(rb.rn, 10, '0'),
     'HTL' || LPAD(rb.rn, 8, '0'),
@@ -258,7 +249,7 @@ SELECT
     CURRENT_TIMESTAMP(),
     CURRENT_TIMESTAMP()
 FROM reservation_base rb
-LEFT JOIN DAILY_ROOM_RATES drr ON rb.HOTEL_ID = drr.HOTEL_ID 
+LEFT JOIN HOTEL_CHAIN_DAILY_ROOM_RATES drr ON rb.HOTEL_ID = drr.HOTEL_ID 
     AND rb.ROOM_TYPE_ID = drr.ROOM_TYPE_ID 
     AND rb.CHECK_IN_DATE = drr.RATE_DATE
     AND drr.RATE_CODE = 'BAR'
@@ -269,7 +260,7 @@ AND rb.CHECK_IN_DATE <= '2024-12-31';
 -- 11. GENERATE ANCILLARY SALES (related to reservations)
 WITH completed_reservations AS (
   SELECT RESERVATION_ID, HOTEL_ID, CUSTOMER_ID, CHECK_IN_DATE, NIGHTS
-  FROM RESERVATIONS 
+  FROM HOTEL_CHAIN_RESERVATIONS 
   WHERE RESERVATION_STATUS = 'Completed'
   AND CHECK_IN_DATE >= '2024-01-01'
 ),
@@ -288,10 +279,10 @@ service_sales AS (
     END as QUANTITY,
     ROW_NUMBER() OVER (ORDER BY ABS(RANDOM())) as rn
   FROM completed_reservations cr
-  CROSS JOIN ANCILLARY_SERVICES s
+  CROSS JOIN HOTEL_CHAIN_ANCILLARY_SERVICES s
   WHERE ABS(RANDOM()) % 5 <= 2 -- 60% chance of ancillary purchase
 )
-INSERT INTO ANCILLARY_SALES
+INSERT INTO HOTEL_CHAIN_ANCILLARY_SALES
 SELECT 
     'SALE' || LPAD(ss.rn, 12, '0'),
     ss.RESERVATION_ID,
@@ -316,7 +307,7 @@ SELECT
 FROM service_sales ss;
 
 -- 12. UPDATE DAILY ROOM RATES with actual sales data
-MERGE INTO DAILY_ROOM_RATES drr
+MERGE INTO HOTEL_CHAIN_DAILY_ROOM_RATES drr
 USING (
     SELECT 
         r.HOTEL_ID,
@@ -325,7 +316,7 @@ USING (
         'BAR' as rate_code,
         SUM(r.ROOMS_BOOKED) as rooms_sold,
         SUM(r.TOTAL_ROOM_REVENUE) as total_revenue
-    FROM RESERVATIONS r
+    FROM HOTEL_CHAIN_RESERVATIONS r
     WHERE r.RESERVATION_STATUS IN ('Completed', 'Confirmed')
     GROUP BY r.HOTEL_ID, r.ROOM_TYPE_ID, r.CHECK_IN_DATE
 ) actual_sales ON (
@@ -339,7 +330,7 @@ WHEN MATCHED THEN UPDATE SET
     REVENUE_GENERATED = actual_sales.total_revenue;
 
 -- 13. GENERATE REVENUE SUMMARY DATA
-INSERT INTO REVENUE_SUMMARY
+INSERT INTO HOTEL_CHAIN_REVENUE_SUMMARY
 SELECT 
     h.HOTEL_ID,
     d.date_value,
@@ -362,14 +353,14 @@ SELECT
     COALESCE(rs.corporate_rooms, 0) as corporate_rooms,
     COALESCE(rs.leisure_rooms, 0) as leisure_rooms,
     CURRENT_TIMESTAMP()
-FROM HOTELS h
+FROM HOTEL_CHAIN_HOTELS h
 CROSS JOIN (
     SELECT DATEADD(day, seq4() - 1, '2024-01-01') as date_value
     FROM TABLE(GENERATOR(ROWCOUNT => 365))
 ) d
 LEFT JOIN (
     SELECT HOTEL_ID, SUM(ROOM_COUNT) as total_rooms
-    FROM HOTEL_ROOM_INVENTORY 
+    FROM HOTEL_CHAIN_ROOM_INVENTORY 
     GROUP BY HOTEL_ID
 ) hri ON h.HOTEL_ID = hri.HOTEL_ID
 LEFT JOIN (
@@ -382,7 +373,7 @@ LEFT JOIN (
         SUM(CASE WHEN r.GUEST_TYPE = 'Group' THEN r.ROOMS_BOOKED ELSE 0 END) as group_rooms,
         SUM(CASE WHEN r.GUEST_TYPE = 'Corporate' THEN r.ROOMS_BOOKED ELSE 0 END) as corporate_rooms,
         SUM(CASE WHEN r.GUEST_TYPE = 'Leisure' THEN r.ROOMS_BOOKED ELSE 0 END) as leisure_rooms
-    FROM RESERVATIONS r
+    FROM HOTEL_CHAIN_RESERVATIONS r
     WHERE r.RESERVATION_STATUS IN ('Completed', 'Confirmed')
     GROUP BY r.HOTEL_ID, r.CHECK_IN_DATE
 ) rs ON h.HOTEL_ID = rs.HOTEL_ID AND d.date_value = rs.CHECK_IN_DATE
@@ -391,17 +382,17 @@ LEFT JOIN (
         a.HOTEL_ID,
         a.SALE_DATE,
         SUM(a.TOTAL_AMOUNT) as ancillary_revenue
-    FROM ANCILLARY_SALES a
+    FROM HOTEL_CHAIN_ANCILLARY_SALES a
     WHERE a.TRANSACTION_STATUS = 'Completed'
     GROUP BY a.HOTEL_ID, a.SALE_DATE
 ) anc ON h.HOTEL_ID = anc.HOTEL_ID AND d.date_value = anc.SALE_DATE;
 
 -- Final data quality checks and statistics
-SELECT 'Reservations Created' as metric, COUNT(*) as count FROM RESERVATIONS;
-SELECT 'Ancillary Sales Created' as metric, COUNT(*) as count FROM ANCILLARY_SALES;
-SELECT 'Daily Rates Created' as metric, COUNT(*) as count FROM DAILY_ROOM_RATES;
-SELECT 'Revenue Summary Created' as metric, COUNT(*) as count FROM REVENUE_SUMMARY;
+SELECT 'Reservations Created' as metric, COUNT(*) as count FROM HOTEL_CHAIN_RESERVATIONS;
+SELECT 'Ancillary Sales Created' as metric, COUNT(*) as count FROM HOTEL_CHAIN_ANCILLARY_SALES;
+SELECT 'Daily Rates Created' as metric, COUNT(*) as count FROM HOTEL_CHAIN_DAILY_ROOM_RATES;
+SELECT 'Revenue Summary Created' as metric, COUNT(*) as count FROM HOTEL_CHAIN_REVENUE_SUMMARY;
 
 -- Show sample data
-SELECT 'Sample Reservations' as section, * FROM RESERVATIONS LIMIT 5;
-SELECT 'Sample Revenue Summary' as section, * FROM REVENUE_SUMMARY WHERE TOTAL_REVENUE > 0 LIMIT 5;
+SELECT 'Sample Reservations' as section, * FROM HOTEL_CHAIN_RESERVATIONS LIMIT 5;
+SELECT 'Sample Revenue Summary' as section, * FROM HOTEL_CHAIN_REVENUE_SUMMARY WHERE TOTAL_REVENUE > 0 LIMIT 5;

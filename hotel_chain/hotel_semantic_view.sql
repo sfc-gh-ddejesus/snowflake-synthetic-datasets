@@ -25,42 +25,42 @@ USE SCHEMA HOTEL_CHAIN;
 CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
 
   TABLES (
-    hotels AS HOTELS
+    hotels AS HOTEL_CHAIN_HOTELS
       PRIMARY KEY (hotel_id)
       WITH SYNONYMS ('properties', 'locations', 'establishments')
       COMMENT = 'Master table of all hotel properties across regions',
       
-    customers AS CUSTOMERS
+    customers AS HOTEL_CHAIN_CUSTOMERS
       PRIMARY KEY (customer_id)
       WITH SYNONYMS ('guests', 'travelers', 'clients')
       COMMENT = 'Customer master data with loyalty program information',
       
-    reservations AS RESERVATIONS
+    reservations AS HOTEL_CHAIN_RESERVATIONS
       PRIMARY KEY (reservation_id)
       WITH SYNONYMS ('bookings', 'stays', 'reservations')
       COMMENT = 'All hotel reservations and booking details',
       
-    room_types AS ROOM_TYPES
+    room_types AS HOTEL_CHAIN_ROOM_TYPES
       PRIMARY KEY (room_type_id)
       WITH SYNONYMS ('room categories', 'accommodation types')
       COMMENT = 'Different room categories and their specifications',
       
-    corporate_accounts AS CORPORATE_ACCOUNTS
+    corporate_accounts AS HOTEL_CHAIN_CORPORATE_ACCOUNTS
       PRIMARY KEY (account_id)
       WITH SYNONYMS ('corporate clients', 'business accounts', 'enterprise customers')
       COMMENT = 'Corporate and group booking accounts',
       
-    ancillary_sales AS ANCILLARY_SALES
+    ancillary_sales AS HOTEL_CHAIN_ANCILLARY_SALES
       PRIMARY KEY (sale_id)
       WITH SYNONYMS ('additional services', 'extra services', 'add-ons')
       COMMENT = 'Sales of additional hotel services and amenities',
       
-    ancillary_services AS ANCILLARY_SERVICES
+    ancillary_services AS HOTEL_CHAIN_ANCILLARY_SERVICES
       PRIMARY KEY (service_id)
       WITH SYNONYMS ('services', 'amenities', 'extras')
       COMMENT = 'Available ancillary services and their pricing',
       
-    revenue_summary AS REVENUE_SUMMARY
+    revenue_summary AS HOTEL_CHAIN_REVENUE_SUMMARY
       PRIMARY KEY (hotel_id, business_date)
       WITH SYNONYMS ('daily performance', 'hotel metrics', 'kpi summary')
       COMMENT = 'Daily revenue and performance metrics by hotel'

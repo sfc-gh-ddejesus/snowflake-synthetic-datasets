@@ -57,7 +57,7 @@ INSERT INTO HOTEL_CHAIN_HOTELS VALUES
 ('HTL025', 'Regency Hotel Kiev', 'Regency', 'Kiev', 'Kiev', 'Ukraine', 'EAME', 'Premium', 234, '2017-08-20', NULL, 'Urban', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 -- 2. INSERT ROOM TYPES
-INSERT INTO ROOM_TYPES VALUES
+INSERT INTO HOTEL_CHAIN_ROOM_TYPES VALUES
 ('RT001', 'Standard King', 'Standard', 2, 2, 350, 'Basic', CURRENT_TIMESTAMP()),
 ('RT002', 'Standard Double', 'Standard', 2, 4, 380, 'Basic', CURRENT_TIMESTAMP()),
 ('RT003', 'Deluxe King', 'Premium', 2, 2, 420, 'Enhanced', CURRENT_TIMESTAMP()),
@@ -70,7 +70,7 @@ INSERT INTO ROOM_TYPES VALUES
 ('RT010', 'Resort Villa', 'Suite', 4, 8, 1200, 'Luxury', CURRENT_TIMESTAMP());
 
 -- 3. INSERT ANCILLARY SERVICES
-INSERT INTO ANCILLARY_SERVICES VALUES
+INSERT INTO HOTEL_CHAIN_ANCILLARY_SERVICES VALUES
 ('SVC001', 'Valet Parking', 'Transportation', 'Parking', 45.00, TRUE, FALSE, CURRENT_TIMESTAMP()),
 ('SVC002', 'Self Parking', 'Transportation', 'Parking', 25.00, TRUE, FALSE, CURRENT_TIMESTAMP()),
 ('SVC003', 'Airport Transfer', 'Transportation', 'Transfer', 85.00, TRUE, TRUE, CURRENT_TIMESTAMP()),
@@ -92,7 +92,7 @@ INSERT INTO ANCILLARY_SERVICES VALUES
 CREATE OR REPLACE SEQUENCE CUSTOMER_SEQ START = 1 INCREMENT = 1;
 
 -- Generate 5000 customers using cross join approach for Snowflake compatibility
-INSERT INTO CUSTOMERS 
+INSERT INTO HOTEL_CHAIN_CUSTOMERS 
 SELECT 
     'CUST' || LPAD(ROW_NUMBER() OVER (ORDER BY NULL), 6, '0'),
     first_names.name,
@@ -131,7 +131,7 @@ CROSS JOIN
 LIMIT 5000;
 
 -- 5. GENERATE CORPORATE ACCOUNTS
-INSERT INTO CORPORATE_ACCOUNTS VALUES
+INSERT INTO HOTEL_CHAIN_CORPORATE_ACCOUNTS VALUES
 ('CORP001', 'Microsoft Corporation', 'Technology', 'Sarah Johnson', 'Corporate Rate', 15.00, 5000, '2023-01-01', '2024-12-31', 'Active', CURRENT_TIMESTAMP()),
 ('CORP002', 'Goldman Sachs Group', 'Financial Services', 'Michael Chen', 'Corporate Rate', 20.00, 8000, '2023-01-01', '2024-12-31', 'Active', CURRENT_TIMESTAMP()),
 ('CORP003', 'Deloitte Consulting', 'Professional Services', 'Emily Rodriguez', 'Group Block', 18.00, 12000, '2023-01-01', '2024-12-31', 'Active', CURRENT_TIMESTAMP()),
@@ -145,7 +145,7 @@ INSERT INTO CORPORATE_ACCOUNTS VALUES
 
 -- 6. GENERATE HOTEL ROOM INVENTORY
 -- For each hotel, assign room counts by room type
-INSERT INTO HOTEL_ROOM_INVENTORY 
+INSERT INTO HOTEL_CHAIN_ROOM_INVENTORY 
 SELECT 
     h.HOTEL_ID,
     rt.ROOM_TYPE_ID,
@@ -166,7 +166,7 @@ CROSS JOIN ROOM_TYPES rt
 WHERE rt.ROOM_TYPE_ID IN ('RT001', 'RT002', 'RT003', 'RT004', 'RT005', 'RT006', 'RT007', 'RT008');
 
 -- 7. GENERATE EVENTS CALENDAR
-INSERT INTO EVENTS_CALENDAR VALUES
+INSERT INTO HOTEL_CHAIN_EVENTS_CALENDAR VALUES
 ('EVT001', 'Consumer Electronics Show', 'Convention', 'Las Vegas', '2024-01-09', '2024-01-12', 180000, 'Extreme', CURRENT_TIMESTAMP()),
 ('EVT002', 'Mobile World Congress', 'Convention', 'Barcelona', '2024-02-26', '2024-02-29', 100000, 'High', CURRENT_TIMESTAMP()),
 ('EVT003', 'South by Southwest', 'Festival', 'Austin', '2024-03-08', '2024-03-17', 400000, 'Extreme', CURRENT_TIMESTAMP()),
@@ -179,7 +179,7 @@ INSERT INTO EVENTS_CALENDAR VALUES
 ('EVT010', 'Tokyo Auto Show', 'Convention', 'Tokyo', '2024-10-25', '2024-11-04', 811000, 'High', CURRENT_TIMESTAMP());
 
 -- 8. GENERATE COMPETITIVE SET DATA
-INSERT INTO COMPETITIVE_SET 
+INSERT INTO HOTEL_CHAIN_COMPETITIVE_SET 
 SELECT 
     'COMP' || LPAD(ROW_NUMBER() OVER (ORDER BY h.HOTEL_ID), 3, '0'),
     h.HOTEL_ID,
