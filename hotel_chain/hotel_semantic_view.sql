@@ -101,7 +101,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.booking_lead_time AS advance_booking_days,
     
     -- Calculated reservation facts
-    reservations.average_daily_rate AS total_room_revenue / nights,
+    reservations.calculated_adr AS total_room_revenue / nights,
     reservations.revenue_per_guest AS total_room_revenue / (adults_count + children_count),
     reservations.booking_value_per_night AS total_amount / nights,
     
@@ -296,8 +296,8 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.total_booking_revenue AS SUM(total_amount)
       WITH SYNONYMS = ('total revenue', 'booking revenue')
       COMMENT = 'Total booking revenue including taxes and fees',
-    reservations.average_daily_rate AS AVG(total_room_revenue / nights)
-      WITH SYNONYMS = ('ADR', 'average rate')
+    reservations.reservation_adr AS AVG(total_room_revenue / nights)
+      WITH SYNONYMS = ('ADR', 'average rate', 'reservation ADR')
       COMMENT = 'Average daily rate across all reservations',
     reservations.average_length_of_stay AS AVG(nights)
       WITH SYNONYMS = ('ALOS', 'average stay duration')
