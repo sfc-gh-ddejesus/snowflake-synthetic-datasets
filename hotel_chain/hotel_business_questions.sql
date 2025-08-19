@@ -18,8 +18,8 @@
 -- 20+ Key Business Questions with Corresponding Analytical Queries
 -- Optimized for Snowflake Data Cloud
 
-USE DATABASE HOTEL_CHAIN;
-USE SCHEMA SALES_REVENUE;
+USE DATABASE SYNTHETIC_DATA;
+USE SCHEMA HOTEL_CHAIN;
 
 -- =====================================================================
 -- REVENUE PERFORMANCE QUESTIONS

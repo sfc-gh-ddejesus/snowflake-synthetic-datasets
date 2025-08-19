@@ -18,8 +18,8 @@
 -- Creates a semantic layer for hotel sales and revenue management analytics
 -- Optimized for Snowflake Cortex Analyst and business intelligence
 
-USE DATABASE HOTEL_CHAIN;
-USE SCHEMA SALES_REVENUE;
+USE DATABASE SYNTHETIC_DATA;
+USE SCHEMA HOTEL_CHAIN;
 
 -- Create the main semantic view for hotel revenue analysis
 CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics

@@ -18,8 +18,8 @@
 -- This script generates 15,000+ reservation records and associated data
 -- Optimized for Snowflake Data Cloud
 
-USE DATABASE HOTEL_CHAIN;
-USE SCHEMA SALES_REVENUE;
+USE DATABASE SYNTHETIC_DATA;
+USE SCHEMA HOTEL_CHAIN;
 
 -- Create sequences for generating IDs
 CREATE OR REPLACE SEQUENCE RESERVATION_SEQ START = 1 INCREMENT = 1;
