@@ -1,0 +1,703 @@
+-- Hotel Chain - Business Analyst Questions and SQL Queries
+-- 20+ Key Business Questions with Corresponding Analytical Queries
+
+USE DATABASE HOTEL_CHAIN;
+USE SCHEMA SALES_REVENUE;
+
+-- =====================================================================
+-- REVENUE PERFORMANCE QUESTIONS
+-- =====================================================================
+
+-- 1. What is the monthly revenue trend by hotel brand across all regions?
+SELECT 
+    h.BRAND,
+    h.REGION,
+    DATE_TRUNC('month', rs.BUSINESS_DATE) as MONTH,
+    COUNT(DISTINCT h.HOTEL_ID) as HOTEL_COUNT,
+    SUM(rs.TOTAL_REVENUE) as TOTAL_REVENUE,
+    AVG(rs.OCCUPANCY_RATE) as AVG_OCCUPANCY_RATE,
+    AVG(rs.ADR) as AVG_DAILY_RATE,
+    AVG(rs.REVPAR) as AVG_REVPAR
+FROM REVENUE_SUMMARY rs
+JOIN HOTELS h ON rs.HOTEL_ID = h.HOTEL_ID
+WHERE rs.BUSINESS_DATE >= '2024-01-01'
+GROUP BY h.BRAND, h.REGION, DATE_TRUNC('month', rs.BUSINESS_DATE)
+ORDER BY h.BRAND, h.REGION, MONTH;
+
+-- 2. Which hotels are underperforming compared to their competitive set based on RevPAR?
+WITH hotel_performance AS (
+    SELECT 
+        h.HOTEL_ID,
+        h.HOTEL_NAME,
+        h.CITY,
+        h.MARKET_SEGMENT,
+        AVG(rs.REVPAR) as AVG_REVPAR,
+        AVG(rs.OCCUPANCY_RATE) as AVG_OCCUPANCY,
+        AVG(rs.ADR) as AVG_ADR
+    FROM HOTELS h
+    JOIN REVENUE_SUMMARY rs ON h.HOTEL_ID = rs.HOTEL_ID
+    WHERE rs.BUSINESS_DATE >= DATEADD('month', -3, CURRENT_DATE())
+    GROUP BY h.HOTEL_ID, h.HOTEL_NAME, h.CITY, h.MARKET_SEGMENT
+),
+market_benchmarks AS (
+    SELECT 
+        MARKET_SEGMENT,
+        CITY,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY AVG_REVPAR) as MEDIAN_REVPAR,
+        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY AVG_REVPAR) as P75_REVPAR
+    FROM hotel_performance
+    GROUP BY MARKET_SEGMENT, CITY
+)
+SELECT 
+    hp.HOTEL_NAME,
+    hp.CITY,
+    hp.MARKET_SEGMENT,
+    hp.AVG_REVPAR,
+    mb.MEDIAN_REVPAR,
+    hp.AVG_REVPAR - mb.MEDIAN_REVPAR as REVPAR_GAP,
+    ROUND((hp.AVG_REVPAR / mb.MEDIAN_REVPAR - 1) * 100, 2) as PERFORMANCE_PCT
+FROM hotel_performance hp
+JOIN market_benchmarks mb ON hp.MARKET_SEGMENT = mb.MARKET_SEGMENT AND hp.CITY = mb.CITY
+WHERE hp.AVG_REVPAR < mb.MEDIAN_REVPAR
+ORDER BY PERFORMANCE_PCT ASC;
+
+-- 3. What is the contribution of ancillary revenue by service category across different hotel brands?
+SELECT 
+    h.BRAND,
+    s.SERVICE_CATEGORY,
+    COUNT(DISTINCT a.SALE_ID) as TRANSACTION_COUNT,
+    SUM(a.TOTAL_AMOUNT) as TOTAL_ANCILLARY_REVENUE,
+    AVG(a.TOTAL_AMOUNT) as AVG_TRANSACTION_VALUE,
+    SUM(rs.TOTAL_REVENUE) as TOTAL_HOTEL_REVENUE,
+    ROUND((SUM(a.TOTAL_AMOUNT) / SUM(rs.TOTAL_REVENUE)) * 100, 2) as ANCILLARY_PENETRATION_PCT
+FROM ANCILLARY_SALES a
+JOIN HOTELS h ON a.HOTEL_ID = h.HOTEL_ID
+JOIN ANCILLARY_SERVICES s ON a.SERVICE_ID = s.SERVICE_ID
+JOIN REVENUE_SUMMARY rs ON a.HOTEL_ID = rs.HOTEL_ID AND a.SALE_DATE = rs.BUSINESS_DATE
+WHERE a.SALE_DATE >= DATEADD('month', -6, CURRENT_DATE())
+GROUP BY h.BRAND, s.SERVICE_CATEGORY
+ORDER BY h.BRAND, TOTAL_ANCILLARY_REVENUE DESC;
+
+-- =====================================================================
+-- CUSTOMER BEHAVIOR & SEGMENTATION QUESTIONS
+-- =====================================================================
+
+-- 4. What is the customer lifetime value by loyalty tier and booking channel?
+WITH customer_metrics AS (
+    SELECT 
+        c.CUSTOMER_ID,
+        c.LOYALTY_TIER,
+        r.BOOKING_CHANNEL,
+        COUNT(r.RESERVATION_ID) as TOTAL_STAYS,
+        SUM(r.TOTAL_AMOUNT) as TOTAL_SPEND,
+        AVG(r.TOTAL_AMOUNT) as AVG_SPEND_PER_STAY,
+        MIN(r.BOOKING_DATE) as FIRST_BOOKING,
+        MAX(r.BOOKING_DATE) as LAST_BOOKING,
+        DATEDIFF('day', MIN(r.BOOKING_DATE), MAX(r.BOOKING_DATE)) as CUSTOMER_TENURE_DAYS
+    FROM CUSTOMERS c
+    JOIN RESERVATIONS r ON c.CUSTOMER_ID = r.CUSTOMER_ID
+    WHERE r.RESERVATION_STATUS = 'Completed'
+    GROUP BY c.CUSTOMER_ID, c.LOYALTY_TIER, r.BOOKING_CHANNEL
+)
+SELECT 
+    LOYALTY_TIER,
+    BOOKING_CHANNEL,
+    COUNT(DISTINCT CUSTOMER_ID) as CUSTOMER_COUNT,
+    AVG(TOTAL_STAYS) as AVG_STAYS_PER_CUSTOMER,
+    AVG(TOTAL_SPEND) as AVG_LIFETIME_VALUE,
+    AVG(AVG_SPEND_PER_STAY) as AVG_SPEND_PER_STAY,
+    AVG(CUSTOMER_TENURE_DAYS) as AVG_TENURE_DAYS
+FROM customer_metrics
+WHERE CUSTOMER_TENURE_DAYS > 0
+GROUP BY LOYALTY_TIER, BOOKING_CHANNEL
+ORDER BY AVG_LIFETIME_VALUE DESC;
+
+-- 5. Which customers have the highest propensity to purchase ancillary services?
+SELECT 
+    c.CUSTOMER_ID,
+    c.FIRST_NAME || ' ' || c.LAST_NAME as CUSTOMER_NAME,
+    c.LOYALTY_TIER,
+    COUNT(DISTINCT r.RESERVATION_ID) as TOTAL_STAYS,
+    COUNT(DISTINCT a.SALE_ID) as ANCILLARY_PURCHASES,
+    ROUND(COUNT(DISTINCT a.SALE_ID) * 100.0 / COUNT(DISTINCT r.RESERVATION_ID), 2) as ANCILLARY_PENETRATION_RATE,
+    SUM(a.TOTAL_AMOUNT) as TOTAL_ANCILLARY_SPEND,
+    AVG(a.TOTAL_AMOUNT) as AVG_ANCILLARY_PER_PURCHASE
+FROM CUSTOMERS c
+JOIN RESERVATIONS r ON c.CUSTOMER_ID = r.CUSTOMER_ID
+LEFT JOIN ANCILLARY_SALES a ON r.RESERVATION_ID = a.RESERVATION_ID
+WHERE r.RESERVATION_STATUS = 'Completed'
+AND r.CHECK_IN_DATE >= DATEADD('year', -1, CURRENT_DATE())
+GROUP BY c.CUSTOMER_ID, c.FIRST_NAME, c.LAST_NAME, c.LOYALTY_TIER
+HAVING COUNT(DISTINCT r.RESERVATION_ID) >= 3
+ORDER BY ANCILLARY_PENETRATION_RATE DESC, TOTAL_ANCILLARY_SPEND DESC
+LIMIT 50;
+
+-- 6. What is the booking lead time distribution by guest type and seasonal patterns?
+SELECT 
+    r.GUEST_TYPE,
+    CASE 
+        WHEN MONTH(r.CHECK_IN_DATE) IN (12, 1, 2) THEN 'Winter'
+        WHEN MONTH(r.CHECK_IN_DATE) IN (3, 4, 5) THEN 'Spring'
+        WHEN MONTH(r.CHECK_IN_DATE) IN (6, 7, 8) THEN 'Summer'
+        ELSE 'Fall'
+    END as SEASON,
+    COUNT(*) as BOOKING_COUNT,
+    AVG(r.ADVANCE_BOOKING_DAYS) as AVG_LEAD_TIME,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.ADVANCE_BOOKING_DAYS) as MEDIAN_LEAD_TIME,
+    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY r.ADVANCE_BOOKING_DAYS) as P25_LEAD_TIME,
+    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY r.ADVANCE_BOOKING_DAYS) as P75_LEAD_TIME
+FROM RESERVATIONS r
+WHERE r.RESERVATION_STATUS != 'Cancelled'
+AND r.ADVANCE_BOOKING_DAYS >= 0
+AND r.CHECK_IN_DATE >= '2024-01-01'
+GROUP BY r.GUEST_TYPE, SEASON
+ORDER BY r.GUEST_TYPE, SEASON;
+
+-- =====================================================================
+-- OPERATIONAL EFFICIENCY QUESTIONS
+-- =====================================================================
+
+-- 7. What is the cancellation rate by booking channel and advance booking days?
+WITH cancellation_analysis AS (
+    SELECT 
+        BOOKING_CHANNEL,
+        CASE 
+            WHEN ADVANCE_BOOKING_DAYS <= 7 THEN '0-7 days'
+            WHEN ADVANCE_BOOKING_DAYS <= 30 THEN '8-30 days'
+            WHEN ADVANCE_BOOKING_DAYS <= 90 THEN '31-90 days'
+            ELSE '90+ days'
+        END as LEAD_TIME_BUCKET,
+        COUNT(*) as TOTAL_BOOKINGS,
+        SUM(CASE WHEN RESERVATION_STATUS = 'Cancelled' THEN 1 ELSE 0 END) as CANCELLED_BOOKINGS,
+        SUM(CASE WHEN RESERVATION_STATUS = 'No-Show' THEN 1 ELSE 0 END) as NO_SHOW_BOOKINGS
+    FROM RESERVATIONS
+    WHERE BOOKING_DATE >= DATEADD('month', -6, CURRENT_DATE())
+    GROUP BY BOOKING_CHANNEL, LEAD_TIME_BUCKET
+)
+SELECT 
+    BOOKING_CHANNEL,
+    LEAD_TIME_BUCKET,
+    TOTAL_BOOKINGS,
+    CANCELLED_BOOKINGS,
+    NO_SHOW_BOOKINGS,
+    ROUND((CANCELLED_BOOKINGS * 100.0 / TOTAL_BOOKINGS), 2) as CANCELLATION_RATE,
+    ROUND((NO_SHOW_BOOKINGS * 100.0 / TOTAL_BOOKINGS), 2) as NO_SHOW_RATE,
+    ROUND(((CANCELLED_BOOKINGS + NO_SHOW_BOOKINGS) * 100.0 / TOTAL_BOOKINGS), 2) as TOTAL_ATTRITION_RATE
+FROM cancellation_analysis
+ORDER BY BOOKING_CHANNEL, 
+    CASE LEAD_TIME_BUCKET 
+        WHEN '0-7 days' THEN 1 
+        WHEN '8-30 days' THEN 2 
+        WHEN '31-90 days' THEN 3 
+        ELSE 4 
+    END;
+
+-- 8. Which room types have the highest utilization rates across different hotel segments?
+SELECT 
+    h.MARKET_SEGMENT,
+    rt.ROOM_TYPE_NAME,
+    rt.ROOM_CATEGORY,
+    SUM(hri.ROOM_COUNT) as TOTAL_INVENTORY,
+    SUM(drr.ROOMS_SOLD) as TOTAL_ROOMS_SOLD,
+    ROUND((SUM(drr.ROOMS_SOLD) * 100.0 / SUM(hri.ROOM_COUNT)) / 365, 2) as AVG_UTILIZATION_RATE,
+    AVG(drr.BASE_RATE) as AVG_RATE,
+    SUM(drr.REVENUE_GENERATED) as TOTAL_REVENUE
+FROM HOTELS h
+JOIN HOTEL_ROOM_INVENTORY hri ON h.HOTEL_ID = hri.HOTEL_ID
+JOIN ROOM_TYPES rt ON hri.ROOM_TYPE_ID = rt.ROOM_TYPE_ID
+JOIN DAILY_ROOM_RATES drr ON h.HOTEL_ID = drr.HOTEL_ID AND hri.ROOM_TYPE_ID = drr.ROOM_TYPE_ID
+WHERE drr.RATE_DATE >= '2024-01-01'
+AND drr.RATE_CODE = 'BAR'
+GROUP BY h.MARKET_SEGMENT, rt.ROOM_TYPE_NAME, rt.ROOM_CATEGORY
+ORDER BY h.MARKET_SEGMENT, AVG_UTILIZATION_RATE DESC;
+
+-- =====================================================================
+-- PRICING & REVENUE MANAGEMENT QUESTIONS
+-- =====================================================================
+
+-- 9. How effective is dynamic pricing in maximizing revenue during peak vs low demand periods?
+WITH demand_analysis AS (
+    SELECT 
+        h.HOTEL_ID,
+        h.HOTEL_NAME,
+        drr.RATE_DATE,
+        drr.DEMAND_LEVEL,
+        AVG(drr.BASE_RATE) as AVG_RATE,
+        SUM(drr.ROOMS_SOLD) as ROOMS_SOLD,
+        SUM(drr.AVAILABLE_ROOMS) as ROOMS_AVAILABLE,
+        SUM(drr.REVENUE_GENERATED) as REVENUE_GENERATED,
+        ROUND((SUM(drr.ROOMS_SOLD) * 100.0 / SUM(drr.AVAILABLE_ROOMS)), 2) as OCCUPANCY_RATE
+    FROM DAILY_ROOM_RATES drr
+    JOIN HOTELS h ON drr.HOTEL_ID = h.HOTEL_ID
+    WHERE drr.RATE_DATE >= DATEADD('month', -3, CURRENT_DATE())
+    AND drr.RATE_CODE = 'BAR'
+    GROUP BY h.HOTEL_ID, h.HOTEL_NAME, drr.RATE_DATE, drr.DEMAND_LEVEL
+)
+SELECT 
+    DEMAND_LEVEL,
+    COUNT(*) as TOTAL_DAYS,
+    AVG(AVG_RATE) as AVG_DAILY_RATE,
+    AVG(OCCUPANCY_RATE) as AVG_OCCUPANCY_RATE,
+    AVG(REVENUE_GENERATED) as AVG_DAILY_REVENUE,
+    SUM(REVENUE_GENERATED) as TOTAL_REVENUE,
+    AVG(REVENUE_GENERATED / ROOMS_AVAILABLE) as AVG_REVPAR
+FROM demand_analysis
+WHERE ROOMS_AVAILABLE > 0
+GROUP BY DEMAND_LEVEL
+ORDER BY AVG_DAILY_RATE DESC;
+
+-- 10. What is the price elasticity of demand for different room categories?
+WITH price_demand AS (
+    SELECT 
+        rt.ROOM_CATEGORY,
+        drr.RATE_DATE,
+        AVG(drr.BASE_RATE) as AVG_PRICE,
+        SUM(drr.ROOMS_SOLD) as TOTAL_DEMAND,
+        SUM(drr.AVAILABLE_ROOMS) as TOTAL_SUPPLY
+    FROM DAILY_ROOM_RATES drr
+    JOIN ROOM_TYPES rt ON drr.ROOM_TYPE_ID = rt.ROOM_TYPE_ID
+    WHERE drr.RATE_DATE >= DATEADD('month', -6, CURRENT_DATE())
+    AND drr.RATE_CODE = 'BAR'
+    GROUP BY rt.ROOM_CATEGORY, drr.RATE_DATE
+    HAVING SUM(drr.AVAILABLE_ROOMS) > 0
+),
+price_buckets AS (
+    SELECT 
+        ROOM_CATEGORY,
+        CASE 
+            WHEN AVG_PRICE <= 200 THEN 'Low ($0-200)'
+            WHEN AVG_PRICE <= 400 THEN 'Medium ($201-400)'
+            WHEN AVG_PRICE <= 600 THEN 'High ($401-600)'
+            ELSE 'Premium ($600+)'
+        END as PRICE_BUCKET,
+        AVG(AVG_PRICE) as AVG_PRICE_IN_BUCKET,
+        AVG(TOTAL_DEMAND * 100.0 / TOTAL_SUPPLY) as AVG_OCCUPANCY_RATE,
+        COUNT(*) as OBSERVATIONS
+    FROM price_demand
+    GROUP BY ROOM_CATEGORY, PRICE_BUCKET
+)
+SELECT 
+    ROOM_CATEGORY,
+    PRICE_BUCKET,
+    AVG_PRICE_IN_BUCKET,
+    AVG_OCCUPANCY_RATE,
+    OBSERVATIONS,
+    LAG(AVG_OCCUPANCY_RATE) OVER (PARTITION BY ROOM_CATEGORY ORDER BY AVG_PRICE_IN_BUCKET) as PREV_OCCUPANCY,
+    LAG(AVG_PRICE_IN_BUCKET) OVER (PARTITION BY ROOM_CATEGORY ORDER BY AVG_PRICE_IN_BUCKET) as PREV_PRICE
+FROM price_buckets
+ORDER BY ROOM_CATEGORY, AVG_PRICE_IN_BUCKET;
+
+-- =====================================================================
+-- CORPORATE & GROUP BUSINESS QUESTIONS
+-- =====================================================================
+
+-- 11. Which corporate accounts provide the highest value and growth potential?
+WITH corporate_performance AS (
+    SELECT 
+        ca.COMPANY_NAME,
+        ca.INDUSTRY,
+        ca.DISCOUNT_PERCENTAGE,
+        ca.ANNUAL_ROOM_NIGHTS_COMMITMENT,
+        COUNT(DISTINCT r.RESERVATION_ID) as ACTUAL_RESERVATIONS,
+        SUM(r.NIGHTS) as ACTUAL_ROOM_NIGHTS,
+        SUM(r.TOTAL_AMOUNT) as TOTAL_REVENUE,
+        AVG(r.TOTAL_AMOUNT / r.NIGHTS) as AVG_DAILY_RATE,
+        COUNT(DISTINCT r.HOTEL_ID) as HOTELS_USED,
+        COUNT(DISTINCT r.CUSTOMER_ID) as UNIQUE_TRAVELERS
+    FROM CORPORATE_ACCOUNTS ca
+    LEFT JOIN RESERVATIONS r ON ca.ACCOUNT_ID = r.CORPORATE_ACCOUNT_ID
+    WHERE r.RESERVATION_STATUS = 'Completed'
+    AND r.CHECK_IN_DATE >= DATEADD('year', -1, CURRENT_DATE())
+    GROUP BY ca.COMPANY_NAME, ca.INDUSTRY, ca.DISCOUNT_PERCENTAGE, ca.ANNUAL_ROOM_NIGHTS_COMMITMENT
+)
+SELECT 
+    COMPANY_NAME,
+    INDUSTRY,
+    ANNUAL_ROOM_NIGHTS_COMMITMENT,
+    ACTUAL_ROOM_NIGHTS,
+    ROUND((ACTUAL_ROOM_NIGHTS * 100.0 / ANNUAL_ROOM_NIGHTS_COMMITMENT), 2) as COMMITMENT_FULFILLMENT_PCT,
+    TOTAL_REVENUE,
+    AVG_DAILY_RATE,
+    DISCOUNT_PERCENTAGE,
+    HOTELS_USED,
+    UNIQUE_TRAVELERS,
+    ROUND(TOTAL_REVENUE / UNIQUE_TRAVELERS, 2) as REVENUE_PER_TRAVELER
+FROM corporate_performance
+WHERE ANNUAL_ROOM_NIGHTS_COMMITMENT > 0
+ORDER BY TOTAL_REVENUE DESC;
+
+-- 12. What is the geographic distribution of corporate travel and potential for expansion?
+SELECT 
+    h.REGION,
+    h.COUNTRY,
+    h.CITY,
+    ca.INDUSTRY,
+    COUNT(DISTINCT r.RESERVATION_ID) as CORPORATE_BOOKINGS,
+    SUM(r.TOTAL_AMOUNT) as CORPORATE_REVENUE,
+    COUNT(DISTINCT ca.ACCOUNT_ID) as UNIQUE_CORPORATE_ACCOUNTS,
+    AVG(r.TOTAL_AMOUNT) as AVG_BOOKING_VALUE,
+    SUM(r.NIGHTS) as TOTAL_ROOM_NIGHTS
+FROM RESERVATIONS r
+JOIN CORPORATE_ACCOUNTS ca ON r.CORPORATE_ACCOUNT_ID = ca.ACCOUNT_ID
+JOIN HOTELS h ON r.HOTEL_ID = h.HOTEL_ID
+WHERE r.RESERVATION_STATUS = 'Completed'
+AND r.CHECK_IN_DATE >= DATEADD('month', -12, CURRENT_DATE())
+GROUP BY h.REGION, h.COUNTRY, h.CITY, ca.INDUSTRY
+HAVING COUNT(DISTINCT r.RESERVATION_ID) >= 5
+ORDER BY CORPORATE_REVENUE DESC;
+
+-- =====================================================================
+-- MARKET ANALYSIS QUESTIONS
+-- =====================================================================
+
+-- 13. How do seasonal trends vary by destination and what drives demand?
+WITH seasonal_performance AS (
+    SELECT 
+        h.CITY,
+        h.COUNTRY,
+        h.PROPERTY_TYPE,
+        CASE 
+            WHEN MONTH(rs.BUSINESS_DATE) IN (12, 1, 2) THEN 'Winter'
+            WHEN MONTH(rs.BUSINESS_DATE) IN (3, 4, 5) THEN 'Spring'
+            WHEN MONTH(rs.BUSINESS_DATE) IN (6, 7, 8) THEN 'Summer'
+            ELSE 'Fall'
+        END as SEASON,
+        AVG(rs.OCCUPANCY_RATE) as AVG_OCCUPANCY,
+        AVG(rs.ADR) as AVG_ADR,
+        AVG(rs.REVPAR) as AVG_REVPAR,
+        SUM(rs.TOTAL_REVENUE) as TOTAL_REVENUE
+    FROM REVENUE_SUMMARY rs
+    JOIN HOTELS h ON rs.HOTEL_ID = h.HOTEL_ID
+    WHERE rs.BUSINESS_DATE >= '2024-01-01'
+    GROUP BY h.CITY, h.COUNTRY, h.PROPERTY_TYPE, SEASON
+)
+SELECT 
+    CITY,
+    COUNTRY,
+    PROPERTY_TYPE,
+    SEASON,
+    AVG_OCCUPANCY,
+    AVG_ADR,
+    AVG_REVPAR,
+    TOTAL_REVENUE,
+    AVG(AVG_REVPAR) OVER (PARTITION BY CITY, COUNTRY, PROPERTY_TYPE) as ANNUAL_AVG_REVPAR,
+    ROUND((AVG_REVPAR / AVG(AVG_REVPAR) OVER (PARTITION BY CITY, COUNTRY, PROPERTY_TYPE) - 1) * 100, 2) as SEASONAL_INDEX
+FROM seasonal_performance
+ORDER BY CITY, PROPERTY_TYPE, 
+    CASE SEASON WHEN 'Winter' THEN 1 WHEN 'Spring' THEN 2 WHEN 'Summer' THEN 3 ELSE 4 END;
+
+-- 14. What is the impact of local events on hotel performance?
+SELECT 
+    e.EVENT_NAME,
+    e.EVENT_TYPE,
+    e.CITY,
+    e.EVENT_START_DATE,
+    e.EVENT_END_DATE,
+    e.EXPECTED_ATTENDANCE,
+    h.HOTEL_NAME,
+    h.BRAND,
+    AVG(CASE WHEN rs.BUSINESS_DATE BETWEEN e.EVENT_START_DATE AND e.EVENT_END_DATE 
+        THEN rs.OCCUPANCY_RATE ELSE NULL END) as EVENT_PERIOD_OCCUPANCY,
+    AVG(CASE WHEN rs.BUSINESS_DATE BETWEEN DATEADD('day', -7, e.EVENT_START_DATE) 
+        AND DATEADD('day', -1, e.EVENT_START_DATE) THEN rs.OCCUPANCY_RATE ELSE NULL END) as PRE_EVENT_OCCUPANCY,
+    AVG(CASE WHEN rs.BUSINESS_DATE BETWEEN e.EVENT_START_DATE AND e.EVENT_END_DATE 
+        THEN rs.ADR ELSE NULL END) as EVENT_PERIOD_ADR,
+    AVG(CASE WHEN rs.BUSINESS_DATE BETWEEN DATEADD('day', -7, e.EVENT_START_DATE) 
+        AND DATEADD('day', -1, e.EVENT_START_DATE) THEN rs.ADR ELSE NULL END) as PRE_EVENT_ADR
+FROM EVENTS_CALENDAR e
+JOIN HOTELS h ON e.CITY = h.CITY
+JOIN REVENUE_SUMMARY rs ON h.HOTEL_ID = rs.HOTEL_ID
+WHERE rs.BUSINESS_DATE BETWEEN DATEADD('day', -7, e.EVENT_START_DATE) 
+    AND DATEADD('day', 7, e.EVENT_END_DATE)
+AND e.EVENT_START_DATE >= '2024-01-01'
+GROUP BY e.EVENT_NAME, e.EVENT_TYPE, e.CITY, e.EVENT_START_DATE, e.EVENT_END_DATE, 
+         e.EXPECTED_ATTENDANCE, h.HOTEL_NAME, h.BRAND
+HAVING EVENT_PERIOD_OCCUPANCY IS NOT NULL AND PRE_EVENT_OCCUPANCY IS NOT NULL
+ORDER BY e.EVENT_START_DATE, e.CITY;
+
+-- =====================================================================
+-- DIGITAL CHANNELS & DISTRIBUTION QUESTIONS
+-- =====================================================================
+
+-- 15. What is the ROI of different booking channels in terms of revenue and customer acquisition cost?
+WITH channel_performance AS (
+    SELECT 
+        r.BOOKING_CHANNEL,
+        r.BOOKING_SOURCE,
+        COUNT(DISTINCT r.RESERVATION_ID) as TOTAL_BOOKINGS,
+        COUNT(DISTINCT r.CUSTOMER_ID) as UNIQUE_CUSTOMERS,
+        SUM(r.TOTAL_AMOUNT) as TOTAL_REVENUE,
+        AVG(r.TOTAL_AMOUNT) as AVG_BOOKING_VALUE,
+        SUM(CASE WHEN r.RESERVATION_STATUS = 'Cancelled' THEN 1 ELSE 0 END) as CANCELLED_BOOKINGS,
+        COUNT(DISTINCT CASE WHEN cust_first_booking.first_booking_channel = r.BOOKING_CHANNEL 
+            THEN r.CUSTOMER_ID ELSE NULL END) as NEW_CUSTOMERS_ACQUIRED
+    FROM RESERVATIONS r
+    LEFT JOIN (
+        SELECT 
+            CUSTOMER_ID, 
+            BOOKING_CHANNEL as first_booking_channel,
+            ROW_NUMBER() OVER (PARTITION BY CUSTOMER_ID ORDER BY BOOKING_DATE) as rn
+        FROM RESERVATIONS 
+        WHERE RESERVATION_STATUS != 'Cancelled'
+    ) cust_first_booking ON r.CUSTOMER_ID = cust_first_booking.CUSTOMER_ID AND cust_first_booking.rn = 1
+    WHERE r.BOOKING_DATE >= DATEADD('month', -6, CURRENT_DATE())
+    GROUP BY r.BOOKING_CHANNEL, r.BOOKING_SOURCE
+)
+SELECT 
+    BOOKING_CHANNEL,
+    BOOKING_SOURCE,
+    TOTAL_BOOKINGS,
+    UNIQUE_CUSTOMERS,
+    TOTAL_REVENUE,
+    AVG_BOOKING_VALUE,
+    ROUND((CANCELLED_BOOKINGS * 100.0 / TOTAL_BOOKINGS), 2) as CANCELLATION_RATE,
+    NEW_CUSTOMERS_ACQUIRED,
+    ROUND((TOTAL_REVENUE / TOTAL_BOOKINGS), 2) as REVENUE_PER_BOOKING,
+    ROUND((TOTAL_REVENUE / UNIQUE_CUSTOMERS), 2) as REVENUE_PER_CUSTOMER
+FROM channel_performance
+ORDER BY TOTAL_REVENUE DESC;
+
+-- 16. How effective is the loyalty program in driving repeat business and higher spend?
+WITH loyalty_analysis AS (
+    SELECT 
+        c.LOYALTY_TIER,
+        c.CUSTOMER_ID,
+        COUNT(r.RESERVATION_ID) as TOTAL_STAYS,
+        SUM(r.TOTAL_AMOUNT) as TOTAL_SPEND,
+        AVG(r.TOTAL_AMOUNT) as AVG_SPEND_PER_STAY,
+        SUM(r.LOYALTY_POINTS_EARNED) as TOTAL_POINTS_EARNED,
+        MIN(r.BOOKING_DATE) as FIRST_BOOKING,
+        MAX(r.BOOKING_DATE) as LAST_BOOKING,
+        COUNT(DISTINCT a.SALE_ID) as ANCILLARY_PURCHASES,
+        SUM(a.TOTAL_AMOUNT) as ANCILLARY_SPEND
+    FROM CUSTOMERS c
+    JOIN RESERVATIONS r ON c.CUSTOMER_ID = r.CUSTOMER_ID
+    LEFT JOIN ANCILLARY_SALES a ON r.RESERVATION_ID = a.RESERVATION_ID
+    WHERE r.RESERVATION_STATUS = 'Completed'
+    AND r.CHECK_IN_DATE >= DATEADD('year', -1, CURRENT_DATE())
+    GROUP BY c.LOYALTY_TIER, c.CUSTOMER_ID
+)
+SELECT 
+    LOYALTY_TIER,
+    COUNT(DISTINCT CUSTOMER_ID) as CUSTOMER_COUNT,
+    AVG(TOTAL_STAYS) as AVG_STAYS_PER_CUSTOMER,
+    AVG(TOTAL_SPEND) as AVG_TOTAL_SPEND,
+    AVG(AVG_SPEND_PER_STAY) as AVG_SPEND_PER_STAY,
+    AVG(TOTAL_POINTS_EARNED) as AVG_POINTS_EARNED,
+    AVG(ANCILLARY_PURCHASES) as AVG_ANCILLARY_PURCHASES,
+    AVG(ANCILLARY_SPEND) as AVG_ANCILLARY_SPEND,
+    ROUND(AVG(ANCILLARY_PURCHASES * 100.0 / TOTAL_STAYS), 2) as ANCILLARY_PENETRATION_RATE
+FROM loyalty_analysis
+GROUP BY LOYALTY_TIER
+ORDER BY 
+    CASE LOYALTY_TIER 
+        WHEN 'Bronze' THEN 1 
+        WHEN 'Silver' THEN 2 
+        WHEN 'Gold' THEN 3 
+        ELSE 4 
+    END;
+
+-- =====================================================================
+-- OPERATIONAL INSIGHTS QUESTIONS
+-- =====================================================================
+
+-- 17. What are the key drivers of guest satisfaction and repeat business?
+WITH guest_behavior AS (
+    SELECT 
+        r.CUSTOMER_ID,
+        h.BRAND,
+        h.MARKET_SEGMENT,
+        r.ROOM_TYPE_ID,
+        r.BOOKING_CHANNEL,
+        COUNT(*) as STAY_COUNT,
+        AVG(r.TOTAL_AMOUNT) as AVG_SPEND,
+        AVG(r.ADVANCE_BOOKING_DAYS) as AVG_LEAD_TIME,
+        COUNT(DISTINCT a.SERVICE_ID) as UNIQUE_SERVICES_USED,
+        SUM(a.TOTAL_AMOUNT) as ANCILLARY_SPEND,
+        MAX(r.CHECK_IN_DATE) as LAST_STAY_DATE,
+        DATEDIFF('day', MAX(r.CHECK_IN_DATE), CURRENT_DATE()) as DAYS_SINCE_LAST_STAY
+    FROM RESERVATIONS r
+    JOIN HOTELS h ON r.HOTEL_ID = h.HOTEL_ID
+    LEFT JOIN ANCILLARY_SALES a ON r.RESERVATION_ID = a.RESERVATION_ID
+    WHERE r.RESERVATION_STATUS = 'Completed'
+    AND r.CHECK_IN_DATE >= DATEADD('year', -2, CURRENT_DATE())
+    GROUP BY r.CUSTOMER_ID, h.BRAND, h.MARKET_SEGMENT, r.ROOM_TYPE_ID, r.BOOKING_CHANNEL
+    HAVING COUNT(*) >= 2 -- Repeat customers only
+)
+SELECT 
+    BRAND,
+    MARKET_SEGMENT,
+    BOOKING_CHANNEL,
+    COUNT(DISTINCT CUSTOMER_ID) as REPEAT_CUSTOMERS,
+    AVG(STAY_COUNT) as AVG_REPEAT_STAYS,
+    AVG(AVG_SPEND) as AVG_SPEND_PER_STAY,
+    AVG(UNIQUE_SERVICES_USED) as AVG_SERVICES_PER_CUSTOMER,
+    AVG(ANCILLARY_SPEND) as AVG_ANCILLARY_SPEND,
+    AVG(DAYS_SINCE_LAST_STAY) as AVG_DAYS_SINCE_LAST_STAY,
+    COUNT(CASE WHEN DAYS_SINCE_LAST_STAY <= 90 THEN 1 END) as RECENT_REPEATERS
+FROM guest_behavior
+GROUP BY BRAND, MARKET_SEGMENT, BOOKING_CHANNEL
+ORDER BY AVG_REPEAT_STAYS DESC;
+
+-- 18. Which hotels have the best operational efficiency metrics?
+WITH efficiency_metrics AS (
+    SELECT 
+        h.HOTEL_ID,
+        h.HOTEL_NAME,
+        h.CITY,
+        h.TOTAL_ROOMS,
+        h.MARKET_SEGMENT,
+        AVG(rs.OCCUPANCY_RATE) as AVG_OCCUPANCY,
+        AVG(rs.ADR) as AVG_ADR,
+        AVG(rs.REVPAR) as AVG_REVPAR,
+        SUM(rs.ROOM_REVENUE) as TOTAL_ROOM_REVENUE,
+        SUM(rs.ANCILLARY_REVENUE) as TOTAL_ANCILLARY_REVENUE,
+        COUNT(DISTINCT r.CUSTOMER_ID) as UNIQUE_GUESTS,
+        AVG(r.NIGHTS) as AVG_LENGTH_OF_STAY,
+        COUNT(CASE WHEN r.BOOKING_CHANNEL = 'Direct' THEN 1 END) * 100.0 / COUNT(*) as DIRECT_BOOKING_PCT,
+        COUNT(CASE WHEN r.RESERVATION_STATUS = 'Cancelled' THEN 1 END) * 100.0 / COUNT(*) as CANCELLATION_RATE
+    FROM HOTELS h
+    JOIN REVENUE_SUMMARY rs ON h.HOTEL_ID = rs.HOTEL_ID
+    JOIN RESERVATIONS r ON h.HOTEL_ID = r.HOTEL_ID AND rs.BUSINESS_DATE = r.CHECK_IN_DATE
+    WHERE rs.BUSINESS_DATE >= DATEADD('month', -6, CURRENT_DATE())
+    GROUP BY h.HOTEL_ID, h.HOTEL_NAME, h.CITY, h.TOTAL_ROOMS, h.MARKET_SEGMENT
+)
+SELECT 
+    HOTEL_NAME,
+    CITY,
+    MARKET_SEGMENT,
+    TOTAL_ROOMS,
+    ROUND(AVG_OCCUPANCY, 2) as AVG_OCCUPANCY_RATE,
+    ROUND(AVG_ADR, 2) as AVG_DAILY_RATE,
+    ROUND(AVG_REVPAR, 2) as REVPAR,
+    TOTAL_ROOM_REVENUE,
+    TOTAL_ANCILLARY_REVENUE,
+    ROUND((TOTAL_ANCILLARY_REVENUE * 100.0 / TOTAL_ROOM_REVENUE), 2) as ANCILLARY_REVENUE_PCT,
+    UNIQUE_GUESTS,
+    ROUND(AVG_LENGTH_OF_STAY, 2) as AVG_LENGTH_OF_STAY,
+    ROUND(DIRECT_BOOKING_PCT, 2) as DIRECT_BOOKING_PCT,
+    ROUND(CANCELLATION_RATE, 2) as CANCELLATION_RATE,
+    -- Composite efficiency score
+    ROUND((AVG_OCCUPANCY * 0.3 + AVG_REVPAR/10 * 0.3 + DIRECT_BOOKING_PCT * 0.2 + 
+           (100-CANCELLATION_RATE) * 0.2), 2) as EFFICIENCY_SCORE
+FROM efficiency_metrics
+ORDER BY EFFICIENCY_SCORE DESC;
+
+-- =====================================================================
+-- FORECASTING & PREDICTIVE QUESTIONS
+-- =====================================================================
+
+-- 19. What is the demand forecast for the next quarter based on historical booking patterns?
+WITH historical_booking_patterns AS (
+    SELECT 
+        h.HOTEL_ID,
+        h.HOTEL_NAME,
+        h.REGION,
+        MONTH(r.CHECK_IN_DATE) as CHECK_IN_MONTH,
+        MONTH(r.BOOKING_DATE) as BOOKING_MONTH,
+        DATEDIFF('day', r.BOOKING_DATE, r.CHECK_IN_DATE) as LEAD_TIME,
+        COUNT(*) as BOOKING_COUNT,
+        SUM(r.TOTAL_AMOUNT) as BOOKING_VALUE
+    FROM RESERVATIONS r
+    JOIN HOTELS h ON r.HOTEL_ID = h.HOTEL_ID
+    WHERE r.RESERVATION_STATUS != 'Cancelled'
+    AND r.CHECK_IN_DATE >= DATEADD('year', -1, CURRENT_DATE())
+    AND r.CHECK_IN_DATE < CURRENT_DATE()
+    GROUP BY h.HOTEL_ID, h.HOTEL_NAME, h.REGION, CHECK_IN_MONTH, BOOKING_MONTH, LEAD_TIME
+),
+future_months AS (
+    SELECT 
+        HOTEL_ID,
+        HOTEL_NAME,
+        REGION,
+        MONTH(DATEADD('month', seq, CURRENT_DATE())) as FORECAST_MONTH,
+        DATEADD('month', seq, CURRENT_DATE()) as FORECAST_DATE
+    FROM (SELECT HOTEL_ID, HOTEL_NAME, REGION FROM HOTELS) h
+    CROSS JOIN (SELECT 1 as seq UNION SELECT 2 UNION SELECT 3) months
+)
+SELECT 
+    fm.HOTEL_NAME,
+    fm.REGION,
+    fm.FORECAST_MONTH,
+    fm.FORECAST_DATE,
+    AVG(hbp.BOOKING_COUNT) as EXPECTED_BOOKINGS,
+    AVG(hbp.BOOKING_VALUE) as EXPECTED_BOOKING_VALUE,
+    SUM(AVG(hbp.BOOKING_COUNT)) OVER (PARTITION BY fm.HOTEL_ID ORDER BY fm.FORECAST_MONTH) as CUMULATIVE_BOOKINGS
+FROM future_months fm
+LEFT JOIN historical_booking_patterns hbp ON fm.HOTEL_ID = hbp.HOTEL_ID 
+    AND fm.FORECAST_MONTH = hbp.CHECK_IN_MONTH
+GROUP BY fm.HOTEL_NAME, fm.REGION, fm.FORECAST_MONTH, fm.FORECAST_DATE, fm.HOTEL_ID
+ORDER BY fm.HOTEL_NAME, fm.FORECAST_MONTH;
+
+-- 20. Which market segments show the highest growth potential for revenue optimization?
+WITH segment_growth_analysis AS (
+    SELECT 
+        h.MARKET_SEGMENT,
+        h.REGION,
+        DATE_TRUNC('quarter', r.CHECK_IN_DATE) as QUARTER,
+        COUNT(DISTINCT r.RESERVATION_ID) as RESERVATION_COUNT,
+        SUM(r.TOTAL_AMOUNT) as TOTAL_REVENUE,
+        AVG(r.TOTAL_AMOUNT) as AVG_RESERVATION_VALUE,
+        COUNT(DISTINCT r.CUSTOMER_ID) as UNIQUE_CUSTOMERS,
+        COUNT(DISTINCT a.SALE_ID) as ANCILLARY_TRANSACTIONS,
+        SUM(a.TOTAL_AMOUNT) as ANCILLARY_REVENUE
+    FROM RESERVATIONS r
+    JOIN HOTELS h ON r.HOTEL_ID = h.HOTEL_ID
+    LEFT JOIN ANCILLARY_SALES a ON r.RESERVATION_ID = a.RESERVATION_ID
+    WHERE r.RESERVATION_STATUS = 'Completed'
+    AND r.CHECK_IN_DATE >= DATEADD('year', -1, CURRENT_DATE())
+    GROUP BY h.MARKET_SEGMENT, h.REGION, QUARTER
+),
+growth_metrics AS (
+    SELECT 
+        MARKET_SEGMENT,
+        REGION,
+        QUARTER,
+        TOTAL_REVENUE,
+        UNIQUE_CUSTOMERS,
+        ANCILLARY_REVENUE,
+        LAG(TOTAL_REVENUE) OVER (PARTITION BY MARKET_SEGMENT, REGION ORDER BY QUARTER) as PREV_QUARTER_REVENUE,
+        LAG(UNIQUE_CUSTOMERS) OVER (PARTITION BY MARKET_SEGMENT, REGION ORDER BY QUARTER) as PREV_QUARTER_CUSTOMERS
+    FROM segment_growth_analysis
+)
+SELECT 
+    MARKET_SEGMENT,
+    REGION,
+    COUNT(*) as QUARTERS_OF_DATA,
+    AVG(TOTAL_REVENUE) as AVG_QUARTERLY_REVENUE,
+    AVG(UNIQUE_CUSTOMERS) as AVG_QUARTERLY_CUSTOMERS,
+    AVG(ANCILLARY_REVENUE) as AVG_QUARTERLY_ANCILLARY,
+    AVG(CASE WHEN PREV_QUARTER_REVENUE > 0 
+        THEN ((TOTAL_REVENUE - PREV_QUARTER_REVENUE) * 100.0 / PREV_QUARTER_REVENUE) 
+        ELSE NULL END) as AVG_REVENUE_GROWTH_RATE,
+    AVG(CASE WHEN PREV_QUARTER_CUSTOMERS > 0 
+        THEN ((UNIQUE_CUSTOMERS - PREV_QUARTER_CUSTOMERS) * 100.0 / PREV_QUARTER_CUSTOMERS) 
+        ELSE NULL END) as AVG_CUSTOMER_GROWTH_RATE,
+    MAX(TOTAL_REVENUE) - MIN(TOTAL_REVENUE) as REVENUE_VARIANCE,
+    STDDEV(TOTAL_REVENUE) as REVENUE_VOLATILITY
+FROM growth_metrics
+GROUP BY MARKET_SEGMENT, REGION
+ORDER BY AVG_REVENUE_GROWTH_RATE DESC NULLS LAST;
+
+-- Summary of all business questions covered:
+SELECT 'Business Analysis Questions Summary' as SECTION;
+SELECT '1. Monthly revenue trend by hotel brand across regions' as QUESTION;
+SELECT '2. Hotels underperforming vs competitive set based on RevPAR' as QUESTION;
+SELECT '3. Ancillary revenue contribution by service category and brand' as QUESTION;
+SELECT '4. Customer lifetime value by loyalty tier and booking channel' as QUESTION;
+SELECT '5. Customer propensity to purchase ancillary services' as QUESTION;
+SELECT '6. Booking lead time distribution by guest type and season' as QUESTION;
+SELECT '7. Cancellation rate by booking channel and lead time' as QUESTION;
+SELECT '8. Room type utilization rates across hotel segments' as QUESTION;
+SELECT '9. Dynamic pricing effectiveness during peak vs low demand' as QUESTION;
+SELECT '10. Price elasticity of demand for different room categories' as QUESTION;
+SELECT '11. Corporate account value and growth potential analysis' as QUESTION;
+SELECT '12. Geographic distribution of corporate travel' as QUESTION;
+SELECT '13. Seasonal trends by destination and demand drivers' as QUESTION;
+SELECT '14. Impact of local events on hotel performance' as QUESTION;
+SELECT '15. ROI of different booking channels' as QUESTION;
+SELECT '16. Loyalty program effectiveness in driving repeat business' as QUESTION;
+SELECT '17. Key drivers of guest satisfaction and repeat business' as QUESTION;
+SELECT '18. Hotel operational efficiency metrics comparison' as QUESTION;
+SELECT '19. Demand forecast for next quarter based on historical patterns' as QUESTION;
+SELECT '20. Market segments with highest growth potential' as QUESTION;
