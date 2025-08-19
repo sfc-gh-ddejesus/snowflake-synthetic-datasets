@@ -1,8 +1,8 @@
-# Hotel Chain - Sales & Revenue Management Data Model
+# Hotel Chain - Sales & Revenue Management Data Model for Snowflake
 
 ## Overview
 
-This project provides a comprehensive synthetic dataset and data model for a hotel chain's sales and revenue management operations. The data model is designed for Snowflake and includes realistic hotel operations data with over 15,000 reservation records and associated ancillary sales.
+This project provides a comprehensive synthetic dataset and data model specifically designed for **Snowflake Data Cloud**. The dataset includes realistic hotel operations data with over 15,000 reservation records and associated ancillary sales, optimized for Snowflake's architecture and SQL capabilities.
 
 ## Project Components
 

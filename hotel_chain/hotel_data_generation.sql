@@ -1,6 +1,23 @@
+/*
+ * Copyright 2024
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 -- Hotel Chain - Synthetic Data Generation Script
 -- This script generates realistic test data for the hotel sales and revenue management system
 -- Run this after executing the DDL script
+-- Snowflake Compatible Version
 
 USE DATABASE HOTEL_CHAIN;
 USE SCHEMA SALES_REVENUE;
@@ -74,50 +91,44 @@ INSERT INTO ANCILLARY_SERVICES VALUES
 -- Create a sequence for customer IDs
 CREATE OR REPLACE SEQUENCE CUSTOMER_SEQ START = 1 INCREMENT = 1;
 
--- Generate 5000 customers
+-- Generate 5000 customers using cross join approach for Snowflake compatibility
 INSERT INTO CUSTOMERS 
 SELECT 
-    'CUST' || LPAD(CUSTOMER_SEQ.NEXTVAL, 6, '0'),
-    CASE (UNIFORM(1, 50, RANDOM()) % 25)
-        WHEN 1 THEN 'James' WHEN 2 THEN 'Mary' WHEN 3 THEN 'John' WHEN 4 THEN 'Patricia'
-        WHEN 5 THEN 'Robert' WHEN 6 THEN 'Jennifer' WHEN 7 THEN 'Michael' WHEN 8 THEN 'Linda'
-        WHEN 9 THEN 'William' WHEN 10 THEN 'Elizabeth' WHEN 11 THEN 'David' WHEN 12 THEN 'Barbara'
-        WHEN 13 THEN 'Richard' WHEN 14 THEN 'Susan' WHEN 15 THEN 'Joseph' WHEN 16 THEN 'Jessica'
-        WHEN 17 THEN 'Thomas' WHEN 18 THEN 'Sarah' WHEN 19 THEN 'Christopher' WHEN 20 THEN 'Karen'
-        WHEN 21 THEN 'Charles' WHEN 22 THEN 'Nancy' WHEN 23 THEN 'Daniel' WHEN 24 THEN 'Lisa'
-        ELSE 'Matthew'
-    END,
-    CASE (UNIFORM(1, 50, RANDOM()) % 25)
-        WHEN 1 THEN 'Smith' WHEN 2 THEN 'Johnson' WHEN 3 THEN 'Williams' WHEN 4 THEN 'Brown'
-        WHEN 5 THEN 'Jones' WHEN 6 THEN 'Garcia' WHEN 7 THEN 'Miller' WHEN 8 THEN 'Davis'
-        WHEN 9 THEN 'Rodriguez' WHEN 10 THEN 'Martinez' WHEN 11 THEN 'Hernandez' WHEN 12 THEN 'Lopez'
-        WHEN 13 THEN 'Gonzalez' WHEN 14 THEN 'Wilson' WHEN 15 THEN 'Anderson' WHEN 16 THEN 'Thomas'
-        WHEN 17 THEN 'Taylor' WHEN 18 THEN 'Moore' WHEN 19 THEN 'Jackson' WHEN 20 THEN 'Martin'
-        WHEN 21 THEN 'Lee' WHEN 22 THEN 'Perez' WHEN 23 THEN 'Thompson' WHEN 24 THEN 'White'
-        ELSE 'Harris'
-    END,
-    'customer' || CUSTOMER_SEQ.CURRVAL || '@email.com',
-    '+1' || (UNIFORM(200, 999, RANDOM())) || (UNIFORM(100, 999, RANDOM())) || (UNIFORM(1000, 9999, RANDOM())),
-    CASE (UNIFORM(1, 100, RANDOM()) % 4)
-        WHEN 0 THEN 'Bronze'
-        WHEN 1 THEN 'Silver' 
-        WHEN 2 THEN 'Gold'
-        ELSE 'Platinum'
-    END,
-    UNIFORM(0, 150000, RANDOM()),
-    DATEADD(day, -UNIFORM(30, 3650, RANDOM()), CURRENT_DATE()),
-    DATEADD(day, -UNIFORM(7300, 25550, RANDOM()), CURRENT_DATE()),
-    CASE (UNIFORM(1, 10, RANDOM()) % 3) WHEN 0 THEN 'M' WHEN 1 THEN 'F' ELSE 'Other' END,
-    CASE (UNIFORM(1, 20, RANDOM()) % 10)
-        WHEN 0 THEN 'USA' WHEN 1 THEN 'Canada' WHEN 2 THEN 'UK' WHEN 3 THEN 'Germany'
-        WHEN 4 THEN 'France' WHEN 5 THEN 'Japan' WHEN 6 THEN 'Australia' WHEN 7 THEN 'China'
-        WHEN 8 THEN 'Brazil' ELSE 'Mexico'
-    END,
+    'CUST' || LPAD(ROW_NUMBER() OVER (ORDER BY NULL), 6, '0'),
+    first_names.name,
+    last_names.name,
+    'customer' || ROW_NUMBER() OVER (ORDER BY NULL) || '@email.com',
+    '+1' || LPAD(ABS(RANDOM()) % 800 + 200, 3, '0') || LPAD(ABS(RANDOM()) % 900 + 100, 3, '0') || LPAD(ABS(RANDOM()) % 9000 + 1000, 4, '0'),
+    loyalty_tiers.tier,
+    ABS(RANDOM()) % 150000,
+    DATEADD(day, -(ABS(RANDOM()) % 3620 + 30), CURRENT_DATE()),
+    DATEADD(day, -(ABS(RANDOM()) % 18250 + 7300), CURRENT_DATE()),
+    genders.gender,
+    countries.country,
     'English',
-    CASE WHEN UNIFORM(1, 10, RANDOM()) <= 7 THEN TRUE ELSE FALSE END,
+    CASE WHEN ABS(RANDOM()) % 10 <= 6 THEN TRUE ELSE FALSE END,
     CURRENT_TIMESTAMP(),
     CURRENT_TIMESTAMP()
-FROM TABLE(GENERATOR(ROWCOUNT => 5000));
+FROM 
+    (SELECT 'James' as name UNION SELECT 'Mary' UNION SELECT 'John' UNION SELECT 'Patricia' UNION SELECT 'Robert' 
+     UNION SELECT 'Jennifer' UNION SELECT 'Michael' UNION SELECT 'Linda' UNION SELECT 'William' UNION SELECT 'Elizabeth'
+     UNION SELECT 'David' UNION SELECT 'Barbara' UNION SELECT 'Richard' UNION SELECT 'Susan' UNION SELECT 'Joseph'
+     UNION SELECT 'Jessica' UNION SELECT 'Thomas' UNION SELECT 'Sarah' UNION SELECT 'Christopher' UNION SELECT 'Karen'
+     UNION SELECT 'Charles' UNION SELECT 'Nancy' UNION SELECT 'Daniel' UNION SELECT 'Lisa' UNION SELECT 'Matthew') first_names
+CROSS JOIN
+    (SELECT 'Smith' as name UNION SELECT 'Johnson' UNION SELECT 'Williams' UNION SELECT 'Brown' UNION SELECT 'Jones'
+     UNION SELECT 'Garcia' UNION SELECT 'Miller' UNION SELECT 'Davis' UNION SELECT 'Rodriguez' UNION SELECT 'Martinez'
+     UNION SELECT 'Hernandez' UNION SELECT 'Lopez' UNION SELECT 'Gonzalez' UNION SELECT 'Wilson' UNION SELECT 'Anderson'
+     UNION SELECT 'Thomas' UNION SELECT 'Taylor' UNION SELECT 'Moore' UNION SELECT 'Jackson' UNION SELECT 'Martin'
+     UNION SELECT 'Lee' UNION SELECT 'Perez' UNION SELECT 'Thompson' UNION SELECT 'White' UNION SELECT 'Harris') last_names
+CROSS JOIN
+    (SELECT 'Bronze' as tier UNION SELECT 'Silver' UNION SELECT 'Gold' UNION SELECT 'Platinum') loyalty_tiers
+CROSS JOIN
+    (SELECT 'M' as gender UNION SELECT 'F' UNION SELECT 'Other') genders
+CROSS JOIN
+    (SELECT 'USA' as country UNION SELECT 'Canada' UNION SELECT 'UK' UNION SELECT 'Germany' UNION SELECT 'France'
+     UNION SELECT 'Japan' UNION SELECT 'Australia' UNION SELECT 'China' UNION SELECT 'Brazil' UNION SELECT 'Mexico') countries
+LIMIT 5000;
 
 -- 5. GENERATE CORPORATE ACCOUNTS
 INSERT INTO CORPORATE_ACCOUNTS VALUES
@@ -172,26 +183,20 @@ INSERT INTO COMPETITIVE_SET
 SELECT 
     'COMP' || LPAD(ROW_NUMBER() OVER (ORDER BY h.HOTEL_ID), 3, '0'),
     h.HOTEL_ID,
-    CASE (ROW_NUMBER() OVER (ORDER BY h.HOTEL_ID) % 8)
-        WHEN 1 THEN 'Four Seasons'
-        WHEN 2 THEN 'Ritz-Carlton'
-        WHEN 3 THEN 'St. Regis'
-        WHEN 4 THEN 'W Hotels'
-        WHEN 5 THEN 'JW Marriott'
-        WHEN 6 THEN 'Conrad Hotels'
-        WHEN 7 THEN 'Waldorf Astoria'
-        ELSE 'InterContinental'
-    END,
-    CASE (ROW_NUMBER() OVER (ORDER BY h.HOTEL_ID) % 4)
-        WHEN 1 THEN 'Marriott'
-        WHEN 2 THEN 'Hilton'
-        WHEN 3 THEN 'IHG'
-        ELSE 'Accor'
-    END,
-    4.5 + (UNIFORM(0, 10, RANDOM()) * 0.05),
-    0.1 + (UNIFORM(1, 50, RANDOM()) * 0.1),
-    h.TOTAL_ROOMS + UNIFORM(-100, 200, RANDOM()),
+    competitor_names.name,
+    competitor_brands.brand,
+    4.0 + (ABS(RANDOM()) % 11) * 0.05, -- Rating between 4.0 and 4.5
+    0.1 + (ABS(RANDOM()) % 50) * 0.1,  -- Distance between 0.1 and 5.0 miles
+    h.TOTAL_ROOMS + (ABS(RANDOM()) % 301) - 150, -- Similar room count +/- 150
     CASE WHEN ROW_NUMBER() OVER (PARTITION BY h.HOTEL_ID ORDER BY h.HOTEL_ID) = 1 THEN TRUE ELSE FALSE END,
     CURRENT_TIMESTAMP()
 FROM HOTELS h
-CROSS JOIN (SELECT 1 as n UNION SELECT 2 UNION SELECT 3) nums;
+CROSS JOIN (
+    SELECT 'Four Seasons' as name UNION SELECT 'Ritz-Carlton' UNION SELECT 'St. Regis' 
+    UNION SELECT 'W Hotels' UNION SELECT 'JW Marriott' UNION SELECT 'Conrad Hotels'
+    UNION SELECT 'Waldorf Astoria' UNION SELECT 'InterContinental'
+) competitor_names
+CROSS JOIN (
+    SELECT 'Marriott' as brand UNION SELECT 'Hilton' UNION SELECT 'IHG' UNION SELECT 'Accor'
+) competitor_brands
+QUALIFY ROW_NUMBER() OVER (PARTITION BY h.HOTEL_ID ORDER BY ABS(RANDOM())) <= 3;
