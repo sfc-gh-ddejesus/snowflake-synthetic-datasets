@@ -317,7 +317,7 @@ SELECT
 FROM service_sales ss;
 
 -- 12. UPDATE DAILY ROOM RATES with actual sales data
-MERGE INTO DAILY_ROOM_RATES drr
+MERGE INTO HOTEL_CHAIN_DAILY_ROOM_RATES drr
 USING (
     SELECT 
         r.HOTEL_ID,
