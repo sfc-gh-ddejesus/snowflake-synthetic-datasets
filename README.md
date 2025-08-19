@@ -1,21 +1,31 @@
-# Synthetic Datasets Collection for Snowflake
+# Snowflake Synthetic Datasets
 
-This repository contains synthetic datasets designed for **Snowflake Data Cloud** analytics, testing, and educational purposes. Each dataset is carefully crafted to represent realistic business scenarios while ensuring complete data privacy and full Snowflake compatibility.
+This repository contains synthetic datasets specifically designed and optimized for **Snowflake Data Cloud**. Each dataset provides realistic business scenarios with complete Snowflake compatibility, advanced semantic layers, and AI-ready analytics capabilities.
+
+## 🏔️ **Built for Snowflake**
+
+✅ **Native Snowflake SQL** - Optimized for Snowflake's architecture and functions  
+✅ **Semantic Views** - Business-friendly layers for Cortex Analyst  
+✅ **Enterprise Ready** - Production-scale datasets with proper licensing  
+✅ **AI/ML Compatible** - Ready for Snowflake's ML and AI capabilities  
+✅ **Performance Optimized** - Designed for Snowflake's cloud architecture
 
 ## 🏨 Hotel Chain Dataset
 
-A comprehensive sales and revenue management dataset for a fictional hotel chain with 25 properties across three regions.
+A comprehensive sales and revenue management dataset for a fictional hotel chain with 25 properties across three regions. **Purpose-built for Snowflake Data Cloud**.
 
 **📁 Location**: `hotel_chain/`
 
-**✨ Features**:
-- **Snowflake-optimized** DDL and data generation scripts
-- 15,000+ realistic reservations
-- 9,000+ ancillary sales transactions  
-- Customer loyalty program data
-- Corporate accounts and group bookings
-- Dynamic pricing and revenue management
-- 20+ business analyst questions with **Snowflake SQL** queries
+**✨ Snowflake Features**:
+- **Semantic View Layer** - Natural language analytics with Cortex Analyst
+- **Native Snowflake SQL** - Optimized DDL and data generation scripts  
+- **15,000+ realistic reservations** with proper Snowflake data types
+- **9,000+ ancillary sales transactions** using Snowflake functions
+- **Customer loyalty program** with business-friendly dimensions
+- **Corporate accounts** and group booking analytics
+- **Dynamic pricing models** for revenue management
+- **25+ business metrics** pre-calculated for immediate insights
+- **40+ semantic dimensions** with synonyms for natural language queries
 
 **🎯 Use Cases**:
 - **Snowflake** revenue management optimization
@@ -26,31 +36,57 @@ A comprehensive sales and revenue management dataset for a fictional hotel chain
 
 [**📖 Full Documentation →**](hotel_chain/README.md)
 
-## 🚀 Quick Start
+## 🚀 Quick Start with Snowflake
 
-Each dataset includes:
-- **Schema DDL**: Database structure and relationships
-- **Data Generation**: Scripts to populate realistic test data
-- **Business Questions**: Pre-built analytical queries
-- **Documentation**: Setup guides and use cases
+Each dataset is **Snowflake-ready** and includes:
+- **Snowflake DDL**: Optimized database schemas for Snowflake Data Cloud
+- **Semantic Views**: Business-friendly layers for Cortex Analyst
+- **Data Generation**: Scripts using native Snowflake functions (GENERATOR, RANDOM, etc.)
+- **Business Analytics**: Pre-built queries optimized for Snowflake SQL
+- **Natural Language**: Ready for Cortex Analyst AI-powered analytics
+- **Documentation**: Complete setup guides and Snowflake best practices
 
-## 📊 Future Datasets
+### Snowflake Setup
+```sql
+-- 1. Create schema and tables (Snowflake-optimized)
+@hotel_schema_ddl.sql
 
-Planned additions:
-- E-commerce retail analytics
-- Healthcare patient management
-- Financial services transactions
-- Manufacturing supply chain
-- SaaS customer engagement
+-- 2. Generate realistic data using Snowflake functions
+@hotel_data_generation.sql
+@hotel_reservations_generation.sql
+
+-- 3. Create semantic view for Cortex Analyst
+@hotel_semantic_view.sql
+
+-- 4. Start asking natural language questions!
+-- "What is the revenue by hotel brand this year?"
+-- "Show me occupancy rates by region and month"
+```
+
+## 📊 Future Snowflake Datasets
+
+Planned additions (all optimized for Snowflake):
+- **E-commerce & Retail Analytics** with Snowflake semantic layers
+- **Healthcare Patient Management** using Snowflake secure data sharing
+- **Financial Services** with Snowflake's compliance features  
+- **Manufacturing Supply Chain** leveraging Snowflake's streaming capabilities
+- **SaaS Customer Engagement** with Cortex ML integration
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our guidelines for:
-- Data model design principles
-- Synthetic data generation best practices
-- Documentation standards
-- Business question development
+Contributions are welcome! Please follow our **Snowflake-focused** guidelines:
+- **Snowflake-native** data model design principles
+- **Semantic view** development best practices  
+- **Cortex Analyst** integration patterns
+- **Snowflake SQL** optimization techniques
+- Documentation standards for Snowflake users
 
 ## 📝 License
 
-These synthetic datasets are provided for educational and analytical purposes. All data is artificially generated and does not represent real business operations or customer information.
+Licensed under the Apache License, Version 2.0. These Snowflake-optimized synthetic datasets are provided for educational and analytical purposes. All data is artificially generated and does not represent real business operations or customer information.
+
+Perfect for:
+- **Snowflake training** and certification preparation
+- **Cortex Analyst** demonstrations and workshops
+- **Proof of concepts** on Snowflake Data Cloud
+- **Academic research** using Snowflake's advanced features

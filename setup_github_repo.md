@@ -7,8 +7,8 @@
 2. Click the "+" icon in the top right corner
 3. Select "New repository"
 4. Fill in repository details:
-   - **Repository name**: `synthetic-datasets`
-   - **Description**: `Collection of synthetic datasets for analytics, testing, and educational purposes`
+   - **Repository name**: `snowflake-synthetic-datasets`
+   - **Description**: `Synthetic datasets specifically designed and optimized for Snowflake Data Cloud with semantic views and Cortex Analyst support`
    - **Visibility**: Public (recommended) or Private
    - **Initialize**: Leave unchecked (we already have files)
 
@@ -17,7 +17,7 @@ Once you create the repository on GitHub, run these commands:
 
 ```bash
 # Add the GitHub repository as remote origin
-git remote add origin https://github.com/YOUR_USERNAME/synthetic-datasets.git
+git remote add origin https://github.com/YOUR_USERNAME/snowflake-synthetic-datasets.git
 
 # Verify the remote was added
 git remote -v
@@ -30,16 +30,19 @@ git push -u origin main
 Your repository is now organized as:
 
 ```
-synthetic-datasets/
-├── README.md                    # Main repository overview
+snowflake-synthetic-datasets/
+├── README.md                    # Main repository overview (Snowflake-focused)
+├── LICENSE                      # Apache 2.0 License
 ├── .gitignore                   # Git ignore patterns
-└── hotel_chain/                 # Hotel dataset project
+└── hotel_chain/                 # Hotel dataset project (Snowflake-optimized)
     ├── README.md                # Hotel dataset documentation
     ├── deployment_guide.md      # Quick setup guide
-    ├── hotel_schema_ddl.sql     # Database schema
-    ├── hotel_data_generation.sql    # Reference data
-    ├── hotel_reservations_generation.sql  # Transaction data
-    └── hotel_business_questions.sql      # Business queries
+    ├── hotel_schema_ddl.sql     # Snowflake-optimized database schema
+    ├── hotel_data_generation.sql    # Reference data with Snowflake functions
+    ├── hotel_reservations_generation.sql  # Transaction data generation
+    ├── hotel_business_questions.sql      # Business analytics queries
+    ├── hotel_semantic_view.sql  # Snowflake Semantic View for Cortex Analyst
+    └── semantic_view_guide.md   # Semantic view usage guide
 ```
 
 ### 4. Alternative: Using GitHub CLI (if you want to install it)
@@ -51,13 +54,13 @@ brew install gh
 gh auth login
 
 # Create repository and push
-gh repo create synthetic-datasets --public --source=. --remote=origin --push
+gh repo create snowflake-synthetic-datasets --public --source=. --remote=origin --push
 ```
 
 ## 🎯 Next Steps
 
 1. **Create the GitHub repository** using the web interface
-2. **Add repository topics** on GitHub: `synthetic-data`, `hotel-analytics`, `snowflake`, `sql`, `business-intelligence`
+2. **Add repository topics** on GitHub: `snowflake`, `synthetic-data`, `semantic-views`, `cortex-analyst`, `hotel-analytics`, `sql`, `business-intelligence`, `data-cloud`
 3. **Enable GitHub Pages** (optional) to showcase documentation
 4. **Add collaborators** if working with a team
 5. **Set up branch protection** for the main branch (optional)
@@ -73,4 +76,4 @@ Your repository includes:
 - ✅ Professional README files
 - ✅ Git ignore patterns
 
-The synthetic hotel dataset is ready for use in analytics, training, and business intelligence applications!
+The Snowflake-optimized hotel dataset is ready for use in analytics, training, and business intelligence applications with advanced semantic layers and Cortex Analyst integration!
