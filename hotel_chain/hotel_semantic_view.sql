@@ -157,7 +157,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     customers.loyalty_tier AS loyalty_tier
       WITH SYNONYMS = ('loyalty status', 'member tier', 'elite status')
       COMMENT = 'Customer loyalty program tier (Bronze, Silver, Gold, Platinum)',
-    customers.country AS customer_country
+    customers.country AS guest_country
       WITH SYNONYMS = ('guest country', 'customer country', 'nationality')
       COMMENT = 'Country of the customer',
     customers.gender AS gender
