@@ -17,15 +17,15 @@ A comprehensive sales and revenue management dataset for a fictional hotel chain
 **📁 Location**: `hotel_chain/`
 
 **✨ Snowflake Features**:
-- **Semantic View Layer** - Natural language analytics with Cortex Analyst
+- **3 Focused Semantic Models** - Revenue Management, Guest Analytics, Ancillary Services
 - **Native Snowflake SQL** - Optimized DDL and data generation scripts  
 - **15,000+ realistic reservations** with proper Snowflake data types
 - **9,000+ ancillary sales transactions** using Snowflake functions
 - **Customer loyalty program** with business-friendly dimensions
 - **Corporate accounts** and group booking analytics
 - **Dynamic pricing models** for revenue management
-- **25+ business metrics** pre-calculated for immediate insights
-- **40+ semantic dimensions** with synonyms for natural language queries
+- **25+ business metrics** across focused semantic models
+- **Natural language ready** for Cortex Analyst
 
 **🎯 Use Cases**:
 - **Snowflake** revenue management optimization
@@ -55,8 +55,8 @@ Each dataset is **Snowflake-ready** and includes:
 @hotel_data_generation.sql
 @hotel_reservations_generation.sql
 
--- 3. Create semantic view for Cortex Analyst
-@hotel_semantic_view.sql
+-- 3. Create semantic models via Snowflake UI
+-- See SEMANTIC_MODELS_GUIDE.md for detailed instructions
 
 -- 4. Start asking natural language questions!
 -- "What is the revenue by hotel brand this year?"

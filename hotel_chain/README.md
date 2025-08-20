@@ -23,6 +23,12 @@ This project provides a comprehensive synthetic dataset and data model specifica
 - **Customer insights**: Loyalty, segmentation, lifetime value
 - **Revenue optimization**: Pricing, demand forecasting
 
+### 4. Semantic Models Guide (`SEMANTIC_MODELS_GUIDE.md`)
+- **3 focused semantic models** for different business functions
+- **Core Revenue Management**: Hotels, reservations, room types, revenue summary
+- **Guest Analytics**: Customers, corporate accounts, booking patterns
+- **Ancillary Services**: Additional revenue streams and service analytics
+
 ## Data Model Architecture
 
 ### Core Business Entities
