@@ -97,7 +97,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.adults_count AS adults,
     reservations.children_count AS children,
     reservations.rooms_booked AS rooms_reserved,
-    reservations.loyalty_points_earned AS loyalty_points,
+    reservations.loyalty_points_earned AS reservation_loyalty_points,
     reservations.advance_booking_days AS booking_lead_time,
     
     -- Calculated reservation facts
@@ -167,7 +167,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
       COMMENT = 'Country of the customer',
     customers.gender AS gender
       COMMENT = 'Customer gender',
-    customers.loyalty_points AS loyalty_points_balance
+    customers.loyalty_points AS customer_loyalty_balance
       WITH SYNONYMS = ('points balance', 'rewards points')
       COMMENT = 'Current loyalty points balance',
       
