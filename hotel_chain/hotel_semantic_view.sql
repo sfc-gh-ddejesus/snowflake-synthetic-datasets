@@ -101,9 +101,9 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.advance_booking_days AS booking_lead_time,
     
     -- Calculated reservation facts
-    reservations.calculated_adr AS total_room_revenue / nights,
-    reservations.revenue_per_guest AS total_room_revenue / (adults_count + children_count),
-    reservations.booking_value_per_night AS total_amount / nights,
+    reservations.calculated_adr AS reservations.total_room_revenue / reservations.nights,
+    reservations.revenue_per_guest AS reservations.total_room_revenue / (reservations.adults_count + reservations.children_count),
+    reservations.booking_value_per_night AS reservations.total_amount / reservations.nights,
     
     -- Ancillary Sales Facts  
     ancillary_sales.quantity AS sale_quantity,
@@ -370,6 +370,10 @@ GRANT REFERENCES, SELECT ON SEMANTIC VIEW hotel_revenue_analytics TO ROLE ACCOUN
 
 -- Example query to validate the semantic view
 SELECT 'Semantic view created successfully' as status;
+
+-- Grant privileges to DEMO_ROLE
+GRANT SELECT ON SEMANTIC VIEW hotel_revenue_analytics TO ROLE DEMO_ROLE;
+GRANT USAGE ON SEMANTIC VIEW hotel_revenue_analytics TO ROLE DEMO_ROLE;
 
 -- Show available dimensions and metrics
 SHOW SEMANTIC DIMENSIONS FOR SEMANTIC VIEW hotel_revenue_analytics;
