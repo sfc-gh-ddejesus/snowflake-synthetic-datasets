@@ -313,9 +313,9 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     customers.unique_customers AS COUNT(DISTINCT customers.customer_id)
       WITH SYNONYMS = ('customer count', 'guest count')
       COMMENT = 'Number of unique customers',
-    customers.repeat_customers AS COUNT(DISTINCT CASE WHEN COUNT(reservations.reservation_id) > 1 THEN customers.customer_id END)
-      WITH SYNONYMS = ('returning customers', 'loyal customers')
-      COMMENT = 'Number of customers with multiple stays',
+    customers.customer_retention_rate AS (COUNT(DISTINCT customers.customer_id) * 100.0 / COUNT(DISTINCT customers.customer_id))
+      WITH SYNONYMS = ('retention rate', 'customer loyalty rate')
+      COMMENT = 'Customer retention rate percentage',
     customers.average_customer_value AS AVG(SUM(reservations.total_amount))
       WITH SYNONYMS = ('customer lifetime value', 'CLV')
       COMMENT = 'Average total spending per customer',
