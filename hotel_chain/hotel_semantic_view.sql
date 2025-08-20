@@ -101,9 +101,9 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.advance_booking_days AS booking_lead_time,
     
     -- Calculated reservation facts
-    reservations.calculated_adr AS room_revenue / nights,
-    reservations.revenue_per_guest AS room_revenue / (adults + children),
-    reservations.booking_value_per_night AS booking_value / nights,
+    reservations.calculated_adr AS total_room_revenue / nights,
+    reservations.revenue_per_guest AS total_room_revenue / (adults_count + children_count),
+    reservations.booking_value_per_night AS total_amount / nights,
     
     -- Ancillary Sales Facts  
     ancillary_sales.quantity AS service_quantity,
@@ -118,7 +118,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     revenue_summary.occupancy_percentage AS occupancy_rate,
     revenue_summary.average_daily_rate AS adr,
     revenue_summary.revenue_per_room AS revpar,
-    revenue_summary.room_revenue AS room_revenue,
+    revenue_summary.room_revenue AS summary_room_revenue,
     revenue_summary.ancillary_revenue AS ancillary_revenue,
     revenue_summary.total_revenue AS total_revenue,
     revenue_summary.walk_in_rooms AS walk_in_rooms,
@@ -313,7 +313,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     customers.unique_customers AS COUNT(DISTINCT customers.customer_id)
       WITH SYNONYMS = ('customer count', 'guest count')
       COMMENT = 'Number of unique customers',
-    customers.repeat_customers AS COUNT(DISTINCT CASE WHEN reservations.total_reservations > 1 THEN customers.customer_id END)
+    customers.repeat_customers AS COUNT(DISTINCT CASE WHEN COUNT(reservations.reservation_id) > 1 THEN customers.customer_id END)
       WITH SYNONYMS = ('returning customers', 'loyal customers')
       COMMENT = 'Number of customers with multiple stays',
     customers.average_customer_value AS AVG(SUM(reservations.total_amount))
@@ -338,7 +338,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     ancillary_sales.average_ancillary_spend AS AVG(total_amount)
       WITH SYNONYMS = ('average service spend')
       COMMENT = 'Average spending per ancillary transaction',
-    ancillary_sales.ancillary_penetration AS (COUNT(DISTINCT reservation_id) * 100.0 / reservations.total_reservations)
+    ancillary_sales.ancillary_penetration AS (COUNT(DISTINCT reservation_id) * 100.0 / COUNT(DISTINCT reservations.reservation_id))
       WITH SYNONYMS = ('service penetration rate', 'ancillary penetration rate')
       COMMENT = 'Percentage of reservations with ancillary purchases',
       
