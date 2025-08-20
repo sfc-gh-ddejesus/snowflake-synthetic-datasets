@@ -96,7 +96,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.fees AS fees,
     reservations.adults_count AS adults,
     reservations.children_count AS children,
-    reservations.rooms_booked AS rooms_reserved,
+    reservations.rooms_booked AS rooms_booked,
     reservations.loyalty_points_earned AS reservation_loyalty_points,
     reservations.advance_booking_days AS booking_lead_time,
     
