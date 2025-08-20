@@ -107,7 +107,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     
     -- Ancillary Sales Facts  
     ancillary_sales.quantity AS ancillary_quantity,
-    ancillary_sales.total_amount AS ancillary_revenue,
+    ancillary_sales.total_amount AS ancillary_sale_amount,
     ancillary_sales.unit_price AS ancillary_unit_price,
     ancillary_sales.tax_amount AS ancillary_tax,
     ancillary_sales.discount_amount AS ancillary_discount,
@@ -119,7 +119,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     revenue_summary.average_daily_rate AS adr,
     revenue_summary.revenue_per_room AS revpar,
     revenue_summary.room_revenue AS summary_room_revenue,
-    revenue_summary.ancillary_revenue AS ancillary_revenue,
+    revenue_summary.ancillary_revenue AS summary_ancillary_revenue,
     revenue_summary.total_revenue AS total_revenue,
     revenue_summary.walk_in_rooms AS walk_in_rooms,
     revenue_summary.group_rooms AS group_rooms,
