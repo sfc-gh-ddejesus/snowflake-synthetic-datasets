@@ -278,34 +278,34 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.total_reservations AS COUNT(reservations.reservation_id)
       WITH SYNONYMS = ('booking count', 'number of reservations')
       COMMENT = 'Total number of reservations',
-    reservations.completed_reservations AS COUNT(CASE WHEN reservation_status = 'Completed' THEN reservation_id END)
+    reservations.completed_reservations AS COUNT(CASE WHEN reservation_status = 'Completed' THEN reservations.reservation_id END)
       WITH SYNONYMS = ('completed stays', 'successful bookings')
       COMMENT = 'Number of completed reservations',
-    reservations.cancelled_reservations AS COUNT(CASE WHEN reservation_status = 'Cancelled' THEN reservation_id END)
+    reservations.cancelled_reservations AS COUNT(CASE WHEN reservation_status = 'Cancelled' THEN reservations.reservation_id END)
       WITH SYNONYMS = ('cancellations')
       COMMENT = 'Number of cancelled reservations',
-    reservations.no_show_reservations AS COUNT(CASE WHEN reservation_status = 'No-Show' THEN reservation_id END)
+    reservations.no_show_reservations AS COUNT(CASE WHEN reservation_status = 'No-Show' THEN reservations.reservation_id END)
       WITH SYNONYMS = ('no shows')
       COMMENT = 'Number of no-show reservations',
-    reservations.total_room_nights AS SUM(nights)
+    reservations.total_room_nights AS SUM(reservations.nights)
       WITH SYNONYMS = ('room nights', 'total nights')
       COMMENT = 'Total number of room nights',
-    reservations.aggregated_room_revenue AS SUM(total_room_revenue)
+    reservations.aggregated_room_revenue AS SUM(reservations.total_room_revenue)
       WITH SYNONYMS = ('room revenue', 'accommodation revenue', 'total room revenue')
       COMMENT = 'Total revenue from room sales',
-    reservations.total_booking_revenue AS SUM(total_amount)
+    reservations.total_booking_revenue AS SUM(reservations.total_amount)
       WITH SYNONYMS = ('total revenue', 'booking revenue')
       COMMENT = 'Total booking revenue including taxes and fees',
-    reservations.reservation_adr AS AVG(total_room_revenue / nights)
+    reservations.reservation_adr AS AVG(reservations.total_room_revenue / reservations.nights)
       WITH SYNONYMS = ('ADR', 'average rate', 'reservation ADR')
       COMMENT = 'Average daily rate across all reservations',
-    reservations.average_length_of_stay AS AVG(nights)
+    reservations.average_length_of_stay AS AVG(reservations.nights)
       WITH SYNONYMS = ('ALOS', 'average stay duration')
       COMMENT = 'Average length of stay in nights',
-    reservations.average_lead_time AS AVG(advance_booking_days)
+    reservations.average_lead_time AS AVG(reservations.advance_booking_days)
       WITH SYNONYMS = ('booking lead time', 'advance booking')
       COMMENT = 'Average number of days between booking and check-in',
-    reservations.cancellation_rate AS (COUNT(CASE WHEN reservation_status = 'Cancelled' THEN reservation_id END) * 100.0 / COUNT(reservation_id))
+    reservations.cancellation_rate AS (COUNT(CASE WHEN reservation_status = 'Cancelled' THEN reservations.reservation_id END) * 100.0 / COUNT(reservations.reservation_id))
       WITH SYNONYMS = ('cancellation percentage')
       COMMENT = 'Percentage of reservations that were cancelled',
       
@@ -329,36 +329,36 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
       COMMENT = 'Average revenue per hotel',
       
     -- Ancillary Revenue Metrics
-    ancillary_sales.total_ancillary_revenue AS SUM(total_amount)
+    ancillary_sales.total_ancillary_revenue AS SUM(ancillary_sales.total_amount)
       WITH SYNONYMS = ('ancillary revenue', 'service revenue', 'additional revenue')
       COMMENT = 'Total revenue from ancillary services',
     ancillary_sales.ancillary_transactions AS COUNT(ancillary_sales.sale_id)
       WITH SYNONYMS = ('service transactions', 'ancillary purchases')
       COMMENT = 'Number of ancillary service transactions',
-    ancillary_sales.average_ancillary_spend AS AVG(total_amount)
+    ancillary_sales.average_ancillary_spend AS AVG(ancillary_sales.total_amount)
       WITH SYNONYMS = ('average service spend')
       COMMENT = 'Average spending per ancillary transaction',
-    ancillary_sales.ancillary_penetration AS (COUNT(DISTINCT reservation_id) * 100.0 / COUNT(DISTINCT reservations.reservation_id))
+    ancillary_sales.ancillary_penetration AS (COUNT(DISTINCT ancillary_sales.reservation_id) * 100.0 / COUNT(DISTINCT reservations.reservation_id))
       WITH SYNONYMS = ('service penetration rate', 'ancillary penetration rate')
       COMMENT = 'Percentage of reservations with ancillary purchases',
       
     -- Revenue Summary Metrics
-    revenue_summary.total_available_rooms AS SUM(total_rooms_available)
+    revenue_summary.total_available_rooms AS SUM(revenue_summary.total_rooms_available)
       WITH SYNONYMS = ('room inventory', 'available inventory')
       COMMENT = 'Total available room inventory',
-    revenue_summary.total_rooms_sold AS SUM(rooms_sold)
+    revenue_summary.total_rooms_sold AS SUM(revenue_summary.rooms_sold)
       WITH SYNONYMS = ('occupied rooms')
       COMMENT = 'Total number of rooms sold',
-    revenue_summary.average_occupancy AS AVG(occupancy_rate)
+    revenue_summary.average_occupancy AS AVG(revenue_summary.occupancy_rate)
       WITH SYNONYMS = ('occupancy rate', 'utilization')
       COMMENT = 'Average occupancy rate across all hotels',
-    revenue_summary.total_hotel_revenue AS SUM(total_revenue)
+    revenue_summary.total_hotel_revenue AS SUM(revenue_summary.total_revenue)
       WITH SYNONYMS = ('total revenue', 'hotel revenue')
       COMMENT = 'Total revenue across all hotels',
-    revenue_summary.average_revpar AS AVG(revpar)
+    revenue_summary.average_revpar AS AVG(revenue_summary.revpar)
       WITH SYNONYMS = ('RevPAR', 'revenue per available room')
       COMMENT = 'Average revenue per available room',
-    revenue_summary.average_adr AS AVG(adr)
+    revenue_summary.average_adr AS AVG(revenue_summary.adr)
       WITH SYNONYMS = ('ADR', 'average daily rate')
       COMMENT = 'Average daily rate from revenue summary'
   )
