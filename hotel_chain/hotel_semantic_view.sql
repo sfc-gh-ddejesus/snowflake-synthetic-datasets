@@ -300,7 +300,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.average_lead_time AS AVG(reservations.advance_booking_days)
       WITH SYNONYMS = ('booking lead time', 'advance booking')
       COMMENT = 'Average number of days between booking and check-in',
-    reservations.cancellation_rate AS (COUNT(CASE WHEN reservation_status = 'Cancelled' THEN reservations.reservation_id END) * 100.0 / COUNT(reservations.reservation_id))
+    reservations.cancellation_rate AS (COUNT(CASE WHEN reservations.reservation_status = 'Cancelled' THEN reservations.reservation_id END) * 100.0 / COUNT(reservations.reservation_id))
       WITH SYNONYMS = ('cancellation percentage')
       COMMENT = 'Percentage of reservations that were cancelled',
       
