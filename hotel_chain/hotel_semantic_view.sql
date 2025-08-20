@@ -106,11 +106,11 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.booking_value_per_night AS total_amount / nights,
     
     -- Ancillary Sales Facts  
-    ancillary_sales.quantity AS ancillary_quantity,
-    ancillary_sales.total_amount AS ancillary_sale_amount,
-    ancillary_sales.unit_price AS ancillary_unit_price,
-    ancillary_sales.tax_amount AS ancillary_tax,
-    ancillary_sales.discount_amount AS ancillary_discount,
+    ancillary_sales.quantity AS sale_quantity,
+    ancillary_sales.total_amount AS sale_amount,
+    ancillary_sales.unit_price AS sale_unit_price,
+    ancillary_sales.tax_amount AS sale_tax_amount,
+    ancillary_sales.discount_amount AS sale_discount_amount,
     
     -- Revenue Summary Facts
     revenue_summary.total_rooms_available AS total_rooms_available,
