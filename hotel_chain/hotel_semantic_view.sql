@@ -104,7 +104,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     ancillary_sales.quantity AS sale_quantity,
     ancillary_sales.total_amount AS sale_amount,
     ancillary_sales.unit_price AS sale_unit_price,
-    ancillary_sales.tax_amount AS sale_tax_amount,
+    ancillary_sales.tax_amount AS sale_tax,
     ancillary_sales.discount_amount AS sale_discount_amount,
     
     -- Revenue Summary Facts
