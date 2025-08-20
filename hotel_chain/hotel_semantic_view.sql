@@ -290,8 +290,8 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.total_room_nights AS SUM(nights)
       WITH SYNONYMS = ('room nights', 'total nights')
       COMMENT = 'Total number of room nights',
-    reservations.total_room_revenue AS SUM(total_room_revenue)
-      WITH SYNONYMS = ('room revenue', 'accommodation revenue')
+    reservations.aggregated_room_revenue AS SUM(total_room_revenue)
+      WITH SYNONYMS = ('room revenue', 'accommodation revenue', 'total room revenue')
       COMMENT = 'Total revenue from room sales',
     reservations.total_booking_revenue AS SUM(total_amount)
       WITH SYNONYMS = ('total revenue', 'booking revenue')
