@@ -90,7 +90,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
   FACTS (
     -- Reservation Facts
     reservations.nights AS nights,
-    reservations.total_room_revenue AS room_revenue,
+    reservations.total_room_revenue AS reservation_room_revenue,
     reservations.total_amount AS booking_value,
     reservations.taxes AS tax_amount,
     reservations.fees AS fee_amount,
