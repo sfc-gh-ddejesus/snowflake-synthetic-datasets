@@ -101,7 +101,6 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.advance_booking_days AS booking_lead_time,
     
     -- Ancillary Sales Facts  
-    ancillary_sales.sale_date AS sale_date,
     ancillary_sales.quantity AS sale_quantity,
     ancillary_sales.total_amount AS sale_amount,
     ancillary_sales.unit_price AS sale_unit_price,
