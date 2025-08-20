@@ -109,7 +109,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     -- Reservation metrics
     reservations.total_reservations AS COUNT(reservations.reservation_id),
     reservations.total_room_nights AS SUM(reservations.nights),
-    reservations.total_room_revenue AS SUM(reservations.total_room_revenue),
+    reservations.total_revenue_sum AS SUM(reservations.total_room_revenue),
     reservations.total_booking_revenue AS SUM(reservations.total_amount),
     reservations.average_daily_rate AS AVG(reservations.total_room_revenue / reservations.nights),
     reservations.average_length_of_stay AS AVG(reservations.nights),
