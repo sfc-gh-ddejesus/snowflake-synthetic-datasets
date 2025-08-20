@@ -101,6 +101,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.advance_booking_days AS booking_lead_time,
     
     -- Ancillary Sales Facts  
+    ancillary_sales.sale_date AS sale_date,
     ancillary_sales.quantity AS sale_quantity,
     ancillary_sales.total_amount AS sale_amount,
     ancillary_sales.unit_price AS sale_unit_price,
@@ -246,8 +247,8 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     ancillary_services.service_category AS service_category
       WITH SYNONYMS = ('category', 'service type')
       COMMENT = 'Category of service (F&B, Spa, Business, Recreation, Transportation)',
-    ancillary_sales.sale_date AS service_date
-      WITH SYNONYMS = ('purchase date', 'transaction date')
+    ancillary_sales.sale_date AS sale_date
+      WITH SYNONYMS = ('purchase date', 'transaction date', 'service date')
       COMMENT = 'Date when the service was purchased',
     ancillary_sales.payment_method AS payment_method
       WITH SYNONYMS = ('payment type')
