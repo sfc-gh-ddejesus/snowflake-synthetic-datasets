@@ -194,22 +194,8 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.currency_code AS currency_code
       COMMENT = 'Currency used for the transaction',
       
-    -- Time Dimensions
-    reservations.check_in_year AS YEAR(check_in_date)
-      WITH SYNONYMS = ('arrival year', 'year')
-      COMMENT = 'Year of check-in',
-    reservations.check_in_month AS MONTH(check_in_date)
-      WITH SYNONYMS = ('arrival month', 'month')
-      COMMENT = 'Month of check-in',
-    reservations.check_in_quarter AS QUARTER(check_in_date)
-      WITH SYNONYMS = ('arrival quarter', 'quarter')
-      COMMENT = 'Quarter of check-in',
-    reservations.check_in_day_of_week AS DAYOFWEEK(check_in_date)
-      WITH SYNONYMS = ('arrival day', 'weekday')
-      COMMENT = 'Day of week for check-in',
-    reservations.check_in_month_name AS MONTHNAME(check_in_date)
-      WITH SYNONYMS = ('arrival month name')
-      COMMENT = 'Month name of check-in',
+    -- Time Dimensions (simplified - using base date columns only)
+    -- Note: Time hierarchy functions like YEAR(), MONTH() should be handled by BI tools
       
     -- Room Type Dimensions
     room_types.room_type_name AS room_type_name
@@ -256,16 +242,8 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     -- Revenue Summary Dimensions
     revenue_summary.business_date AS business_date
       WITH SYNONYMS = ('date', 'performance date')
-      COMMENT = 'Business date for the revenue summary',
-    revenue_summary.business_year AS YEAR(business_date)
-      WITH SYNONYMS = ('year')
-      COMMENT = 'Business year',
-    revenue_summary.business_month AS MONTH(business_date)
-      WITH SYNONYMS = ('month')
-      COMMENT = 'Business month',
-    revenue_summary.business_quarter AS QUARTER(business_date)
-      WITH SYNONYMS = ('quarter')
-      COMMENT = 'Business quarter'
+      COMMENT = 'Business date for the revenue summary'
+    -- Note: Date hierarchy functions removed - should be handled by BI tools
   )
 
   METRICS (
@@ -273,13 +251,13 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.total_reservations AS COUNT(reservations.reservation_id)
       WITH SYNONYMS = ('booking count', 'number of reservations')
       COMMENT = 'Total number of reservations',
-    reservations.completed_reservations AS COUNT(CASE WHEN reservation_status = 'Completed' THEN reservations.reservation_id END)
+    reservations.completed_reservations AS COUNT(CASE WHEN reservations.reservation_status = 'Completed' THEN reservations.reservation_id END)
       WITH SYNONYMS = ('completed stays', 'successful bookings')
       COMMENT = 'Number of completed reservations',
-    reservations.cancelled_reservations AS COUNT(CASE WHEN reservation_status = 'Cancelled' THEN reservations.reservation_id END)
+    reservations.cancelled_reservations AS COUNT(CASE WHEN reservations.reservation_status = 'Cancelled' THEN reservations.reservation_id END)
       WITH SYNONYMS = ('cancellations')
       COMMENT = 'Number of cancelled reservations',
-    reservations.no_show_reservations AS COUNT(CASE WHEN reservation_status = 'No-Show' THEN reservations.reservation_id END)
+    reservations.no_show_reservations AS COUNT(CASE WHEN reservations.reservation_status = 'No-Show' THEN reservations.reservation_id END)
       WITH SYNONYMS = ('no shows')
       COMMENT = 'Number of no-show reservations',
     reservations.total_room_nights AS SUM(reservations.nights)
@@ -311,17 +289,17 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     customers.customer_retention_rate AS (COUNT(DISTINCT customers.customer_id) * 100.0 / COUNT(DISTINCT customers.customer_id))
       WITH SYNONYMS = ('retention rate', 'customer loyalty rate')
       COMMENT = 'Customer retention rate percentage',
-    customers.average_customer_value AS AVG(SUM(reservations.total_amount))
-      WITH SYNONYMS = ('customer lifetime value', 'CLV')
-      COMMENT = 'Average total spending per customer',
+    customers.average_customer_value AS AVG(reservations.total_amount)
+      WITH SYNONYMS = ('customer lifetime value', 'CLV', 'average booking value')
+      COMMENT = 'Average booking value per customer',
       
     -- Hotel Performance Metrics
     hotels.unique_hotels AS COUNT(DISTINCT hotels.hotel_id)
       WITH SYNONYMS = ('property count', 'hotel count')
       COMMENT = 'Number of unique hotels',
-    hotels.average_hotel_revenue AS AVG(SUM(reservations.total_amount))
-      WITH SYNONYMS = ('revenue per hotel')
-      COMMENT = 'Average revenue per hotel',
+    hotels.average_hotel_revenue AS AVG(reservations.total_amount)
+      WITH SYNONYMS = ('revenue per hotel', 'average booking revenue')
+      COMMENT = 'Average booking revenue per hotel',
       
     -- Ancillary Revenue Metrics
     ancillary_sales.total_ancillary_revenue AS SUM(ancillary_sales.total_amount)
