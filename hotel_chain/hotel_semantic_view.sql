@@ -89,28 +89,28 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
 
   FACTS (
     -- Reservation Facts
-    reservations.nights_stayed AS nights,
-    reservations.room_revenue AS total_room_revenue,
-    reservations.total_booking_value AS total_amount,
-    reservations.tax_amount AS taxes,
-    reservations.fee_amount AS fees,
-    reservations.adults_staying AS adults_count,
-    reservations.children_staying AS children_count,
-    reservations.rooms_reserved AS rooms_booked,
-    reservations.loyalty_points AS loyalty_points_earned,
-    reservations.booking_lead_time AS advance_booking_days,
+    reservations.nights AS nights,
+    reservations.total_room_revenue AS room_revenue,
+    reservations.total_amount AS booking_value,
+    reservations.taxes AS tax_amount,
+    reservations.fees AS fee_amount,
+    reservations.adults_count AS adults,
+    reservations.children_count AS children,
+    reservations.rooms_booked AS rooms_reserved,
+    reservations.loyalty_points_earned AS loyalty_points,
+    reservations.advance_booking_days AS booking_lead_time,
     
     -- Calculated reservation facts
-    reservations.calculated_adr AS total_room_revenue / nights,
-    reservations.revenue_per_guest AS total_room_revenue / (adults_count + children_count),
-    reservations.booking_value_per_night AS total_amount / nights,
+    reservations.calculated_adr AS room_revenue / nights,
+    reservations.revenue_per_guest AS room_revenue / (adults + children),
+    reservations.booking_value_per_night AS booking_value / nights,
     
     -- Ancillary Sales Facts  
-    ancillary_sales.service_quantity AS quantity,
-    ancillary_sales.service_revenue AS total_amount,
-    ancillary_sales.service_unit_price AS unit_price,
-    ancillary_sales.service_tax AS tax_amount,
-    ancillary_sales.service_discount AS discount_amount,
+    ancillary_sales.quantity AS service_quantity,
+    ancillary_sales.total_amount AS service_revenue,
+    ancillary_sales.unit_price AS service_unit_price,
+    ancillary_sales.tax_amount AS service_tax,
+    ancillary_sales.discount_amount AS service_discount,
     
     -- Revenue Summary Facts
     revenue_summary.total_rooms_available AS total_rooms_available,
@@ -138,7 +138,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     hotels.city AS city
       WITH SYNONYMS = ('location', 'destination')
       COMMENT = 'City where the hotel is located',
-    hotels.state AS state_province
+    hotels.state_province AS state_province
       WITH SYNONYMS = ('state', 'province', 'region')
       COMMENT = 'State or province of the hotel',
     hotels.country AS country
@@ -162,7 +162,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     customers.loyalty_tier AS loyalty_tier
       WITH SYNONYMS = ('loyalty status', 'member tier', 'elite status')
       COMMENT = 'Customer loyalty program tier (Bronze, Silver, Gold, Platinum)',
-    customers.customer_country AS customer_country
+    customers.country AS customer_country
       WITH SYNONYMS = ('guest country', 'nationality')
       COMMENT = 'Country of the customer',
     customers.gender AS gender
@@ -196,7 +196,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.rate_code AS rate_code
       WITH SYNONYMS = ('rate plan', 'pricing code')
       COMMENT = 'Rate code used for pricing (BAR, CORP, AAA, GOVT)',
-    reservations.currency AS currency_code
+    reservations.currency_code AS currency_code
       COMMENT = 'Currency used for the transaction',
       
     -- Time Dimensions
