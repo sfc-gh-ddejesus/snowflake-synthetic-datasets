@@ -136,8 +136,8 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     hotels.state_province AS state_province
       WITH SYNONYMS = ('state', 'province', 'region')
       COMMENT = 'State or province of the hotel',
-    hotels.country AS country
-      WITH SYNONYMS = ('nation')
+    hotels.country AS hotel_country
+      WITH SYNONYMS = ('nation', 'hotel country')
       COMMENT = 'Country where the hotel is located',
     hotels.region AS region
       WITH SYNONYMS = ('geographic region', 'area')
@@ -158,7 +158,7 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
       WITH SYNONYMS = ('loyalty status', 'member tier', 'elite status')
       COMMENT = 'Customer loyalty program tier (Bronze, Silver, Gold, Platinum)',
     customers.country AS customer_country
-      WITH SYNONYMS = ('guest country', 'nationality')
+      WITH SYNONYMS = ('guest country', 'customer country', 'nationality')
       COMMENT = 'Country of the customer',
     customers.gender AS gender
       COMMENT = 'Customer gender',
