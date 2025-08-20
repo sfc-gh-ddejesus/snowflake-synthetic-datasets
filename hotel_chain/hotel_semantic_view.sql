@@ -100,11 +100,6 @@ CREATE OR REPLACE SEMANTIC VIEW hotel_revenue_analytics
     reservations.loyalty_points_earned AS reservation_loyalty_points,
     reservations.advance_booking_days AS booking_lead_time,
     
-    -- Calculated reservation facts
-    reservations.calculated_adr AS reservations.total_room_revenue / reservations.nights,
-    reservations.revenue_per_guest AS reservations.total_room_revenue / (reservations.adults_count + reservations.children_count),
-    reservations.booking_value_per_night AS reservations.total_amount / reservations.nights,
-    
     -- Ancillary Sales Facts  
     ancillary_sales.quantity AS sale_quantity,
     ancillary_sales.total_amount AS sale_amount,
