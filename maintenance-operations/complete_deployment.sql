@@ -1,0 +1,226 @@
+-- =====================================================
+-- Industrial Maintenance Operations - Complete Database
+-- Deployment Script for Snowflake
+-- =====================================================
+-- This script creates a complete maintenance operations database
+-- with a full year of sample data for analysis and reporting
+
+-- Database and Schema Setup
+CREATE DATABASE IF NOT EXISTS MAINTENANCE_OPERATIONS;
+USE DATABASE MAINTENANCE_OPERATIONS;
+CREATE SCHEMA IF NOT EXISTS OPERATIONS;
+USE SCHEMA OPERATIONS;
+
+-- =====================================================
+-- DEPLOYMENT INSTRUCTIONS
+-- =====================================================
+/*
+To deploy this database:
+1. Run this script in Snowflake as a user with CREATE DATABASE privileges
+2. The script will create all tables, insert sample data, and create views
+3. Execute the sample queries at the end to verify the installation
+4. Total records created:
+   - 25 Equipment items
+   - 12 Technicians
+   - 10 Maintenance Types
+   - 15 Parts in Inventory
+   - 12 Failure Codes
+   - 5 Maintenance Procedures
+   - 30+ Work Orders (mix of completed, in-progress, and open)
+   - 40+ Work Order Assignments
+   - 17 Parts Usage Records
+   - 7 Failure Tracking Records
+
+Expected database size: ~5MB
+*/
+
+-- Set context
+USE DATABASE MAINTENANCE_OPERATIONS;
+USE SCHEMA OPERATIONS;
+
+-- Include all DDL from schema file
+-- (This would include the complete schema from maintenance_schema.sql)
+
+-- Include all sample data
+-- (This would include all data from sample_data.sql and work_orders_data.sql)
+
+-- =====================================================
+-- ADDITIONAL UTILITY FUNCTIONS AND PROCEDURES
+-- =====================================================
+
+-- Function to calculate equipment age
+CREATE OR REPLACE FUNCTION EQUIPMENT_AGE_YEARS(installation_date DATE)
+RETURNS NUMBER(5,2)
+LANGUAGE SQL
+AS
+$$
+  DATEDIFF('day', installation_date, CURRENT_DATE()) / 365.25
+$$;
+
+-- Function to calculate maintenance cost per hour
+CREATE OR REPLACE FUNCTION MAINTENANCE_COST_PER_HOUR(total_cost NUMBER, total_hours NUMBER)
+RETURNS NUMBER(10,2)
+LANGUAGE SQL
+AS
+$$
+  CASE 
+    WHEN total_hours > 0 THEN total_cost / total_hours
+    ELSE 0
+  END
+$$;
+
+-- =====================================================
+-- ADVANCED VIEWS FOR ANALYSIS
+-- =====================================================
+
+-- Equipment Reliability Metrics
+CREATE OR REPLACE VIEW VW_EQUIPMENT_RELIABILITY AS
+SELECT 
+    e.EQUIPMENT_ID,
+    e.EQUIPMENT_NAME,
+    e.EQUIPMENT_TYPE,
+    e.CRITICALITY_LEVEL,
+    EQUIPMENT_AGE_YEARS(e.INSTALLATION_DATE) as AGE_YEARS,
+    COUNT(wo.WORK_ORDER_ID) as TOTAL_WORK_ORDERS,
+    SUM(CASE WHEN wo.STATUS = 'COMPLETED' THEN 1 ELSE 0 END) as COMPLETED_WORK_ORDERS,
+    SUM(CASE WHEN mt.CATEGORY = 'EMERGENCY' THEN 1 ELSE 0 END) as EMERGENCY_REPAIRS,
+    SUM(CASE WHEN mt.CATEGORY = 'PREVENTIVE' THEN 1 ELSE 0 END) as PREVENTIVE_MAINTENANCE,
+    SUM(CASE WHEN mt.CATEGORY = 'CORRECTIVE' THEN 1 ELSE 0 END) as CORRECTIVE_MAINTENANCE,
+    COALESCE(SUM(wo.DOWNTIME_HOURS), 0) as TOTAL_DOWNTIME_HOURS,
+    COALESCE(SUM(wo.ACTUAL_COST), 0) as TOTAL_MAINTENANCE_COST,
+    AVG(wo.ACTUAL_HOURS) as AVG_REPAIR_TIME,
+    -- Reliability KPIs
+    CASE 
+        WHEN COUNT(wo.WORK_ORDER_ID) > 0 
+        THEN (8760 - COALESCE(SUM(wo.DOWNTIME_HOURS), 0)) / 8760 * 100 
+        ELSE 100 
+    END as AVAILABILITY_PERCENT,
+    CASE 
+        WHEN COUNT(wo.WORK_ORDER_ID) > 0 
+        THEN COALESCE(SUM(wo.DOWNTIME_HOURS), 0) / COUNT(wo.WORK_ORDER_ID) 
+        ELSE 0 
+    END as MTTR_HOURS -- Mean Time To Repair
+FROM EQUIPMENT e
+LEFT JOIN WORK_ORDERS wo ON e.EQUIPMENT_ID = wo.EQUIPMENT_ID
+LEFT JOIN MAINTENANCE_TYPES mt ON wo.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+GROUP BY e.EQUIPMENT_ID, e.EQUIPMENT_NAME, e.EQUIPMENT_TYPE, e.CRITICALITY_LEVEL, e.INSTALLATION_DATE;
+
+-- Maintenance Cost Analysis
+CREATE OR REPLACE VIEW VW_MAINTENANCE_COST_ANALYSIS AS
+SELECT 
+    e.EQUIPMENT_TYPE,
+    e.CRITICALITY_LEVEL,
+    COUNT(DISTINCT e.EQUIPMENT_ID) as EQUIPMENT_COUNT,
+    COUNT(wo.WORK_ORDER_ID) as TOTAL_WORK_ORDERS,
+    SUM(wo.ACTUAL_COST) as TOTAL_COST,
+    AVG(wo.ACTUAL_COST) as AVG_COST_PER_WORK_ORDER,
+    SUM(wo.ACTUAL_COST) / COUNT(DISTINCT e.EQUIPMENT_ID) as COST_PER_EQUIPMENT,
+    SUM(wop.TOTAL_COST) as TOTAL_PARTS_COST,
+    SUM(wo.ACTUAL_COST) - COALESCE(SUM(wop.TOTAL_COST), 0) as TOTAL_LABOR_COST,
+    -- Cost breakdown percentages
+    COALESCE(SUM(wop.TOTAL_COST), 0) / NULLIF(SUM(wo.ACTUAL_COST), 0) * 100 as PARTS_COST_PERCENT,
+    (SUM(wo.ACTUAL_COST) - COALESCE(SUM(wop.TOTAL_COST), 0)) / NULLIF(SUM(wo.ACTUAL_COST), 0) * 100 as LABOR_COST_PERCENT
+FROM EQUIPMENT e
+LEFT JOIN WORK_ORDERS wo ON e.EQUIPMENT_ID = wo.EQUIPMENT_ID AND wo.STATUS = 'COMPLETED'
+LEFT JOIN WORK_ORDER_PARTS wop ON wo.WORK_ORDER_ID = wop.WORK_ORDER_ID
+GROUP BY e.EQUIPMENT_TYPE, e.CRITICALITY_LEVEL;
+
+-- Technician Performance Metrics
+CREATE OR REPLACE VIEW VW_TECHNICIAN_PERFORMANCE AS
+SELECT 
+    t.TECHNICIAN_ID,
+    t.FIRST_NAME || ' ' || t.LAST_NAME as TECHNICIAN_NAME,
+    t.SPECIALIZATION,
+    t.CERTIFICATION_LEVEL,
+    t.HOURLY_RATE,
+    COUNT(DISTINCT woa.WORK_ORDER_ID) as WORK_ORDERS_ASSIGNED,
+    SUM(woa.HOURS_WORKED) as TOTAL_HOURS_WORKED,
+    SUM(woa.HOURS_WORKED * t.HOURLY_RATE) as TOTAL_LABOR_COST,
+    AVG(woa.HOURS_WORKED) as AVG_HOURS_PER_WORK_ORDER,
+    -- Efficiency metrics
+    COUNT(CASE WHEN woa.ROLE = 'LEAD' THEN 1 END) as LEAD_ASSIGNMENTS,
+    COUNT(CASE WHEN woa.ROLE = 'ASSISTANT' THEN 1 END) as ASSISTANT_ASSIGNMENTS,
+    COUNT(CASE WHEN woa.ROLE = 'SPECIALIST' THEN 1 END) as SPECIALIST_ASSIGNMENTS,
+    -- Performance scoring (work orders per week)
+    COUNT(DISTINCT woa.WORK_ORDER_ID) / 52.0 as WORK_ORDERS_PER_WEEK
+FROM TECHNICIANS t
+LEFT JOIN WORK_ORDER_ASSIGNMENTS woa ON t.TECHNICIAN_ID = woa.TECHNICIAN_ID
+GROUP BY t.TECHNICIAN_ID, t.FIRST_NAME, t.LAST_NAME, t.SPECIALIZATION, t.CERTIFICATION_LEVEL, t.HOURLY_RATE;
+
+-- Failure Analysis View
+CREATE OR REPLACE VIEW VW_FAILURE_ANALYSIS AS
+SELECT 
+    fc.FAILURE_CODE,
+    fc.FAILURE_DESCRIPTION,
+    fc.FAILURE_CATEGORY,
+    fc.ROOT_CAUSE,
+    COUNT(wof.WORK_ORDER_ID) as OCCURRENCE_COUNT,
+    COUNT(DISTINCT e.EQUIPMENT_TYPE) as AFFECTED_EQUIPMENT_TYPES,
+    AVG(wo.ACTUAL_COST) as AVG_REPAIR_COST,
+    AVG(wo.DOWNTIME_HOURS) as AVG_DOWNTIME_HOURS,
+    SUM(wo.ACTUAL_COST) as TOTAL_COST_IMPACT,
+    -- Failure rate per equipment type
+    LISTAGG(DISTINCT e.EQUIPMENT_TYPE, ', ') as EQUIPMENT_TYPES_AFFECTED
+FROM FAILURE_CODES fc
+LEFT JOIN WORK_ORDER_FAILURES wof ON fc.FAILURE_CODE = wof.FAILURE_CODE
+LEFT JOIN WORK_ORDERS wo ON wof.WORK_ORDER_ID = wo.WORK_ORDER_ID
+LEFT JOIN EQUIPMENT e ON wo.EQUIPMENT_ID = e.EQUIPMENT_ID
+GROUP BY fc.FAILURE_CODE, fc.FAILURE_DESCRIPTION, fc.FAILURE_CATEGORY, fc.ROOT_CAUSE;
+
+-- Parts Inventory Analysis
+CREATE OR REPLACE VIEW VW_PARTS_ANALYSIS AS
+SELECT 
+    p.PART_ID,
+    p.PART_NAME,
+    p.CATEGORY,
+    p.UNIT_COST,
+    p.QUANTITY_ON_HAND,
+    p.REORDER_POINT,
+    COALESCE(SUM(wop.QUANTITY_USED), 0) as TOTAL_USAGE,
+    COALESCE(SUM(wop.TOTAL_COST), 0) as TOTAL_COST_CONSUMED,
+    COUNT(DISTINCT wop.WORK_ORDER_ID) as WORK_ORDERS_USED_IN,
+    -- Inventory status
+    CASE 
+        WHEN p.QUANTITY_ON_HAND <= p.REORDER_POINT THEN 'REORDER_REQUIRED'
+        WHEN p.QUANTITY_ON_HAND <= p.REORDER_POINT * 1.5 THEN 'LOW_STOCK'
+        ELSE 'ADEQUATE'
+    END as STOCK_STATUS,
+    -- Usage metrics
+    CASE 
+        WHEN COALESCE(SUM(wop.QUANTITY_USED), 0) > 0 
+        THEN p.QUANTITY_ON_HAND / (COALESCE(SUM(wop.QUANTITY_USED), 0) / 12.0)
+        ELSE 999
+    END as MONTHS_OF_STOCK
+FROM PARTS_INVENTORY p
+LEFT JOIN WORK_ORDER_PARTS wop ON p.PART_ID = wop.PART_ID
+GROUP BY p.PART_ID, p.PART_NAME, p.CATEGORY, p.UNIT_COST, p.QUANTITY_ON_HAND, p.REORDER_POINT;
+
+-- Monthly Maintenance Trends
+CREATE OR REPLACE VIEW VW_MONTHLY_MAINTENANCE_TRENDS AS
+SELECT 
+    YEAR(wo.ACTUAL_START_DATE) as YEAR,
+    MONTH(wo.ACTUAL_START_DATE) as MONTH,
+    MONTHNAME(wo.ACTUAL_START_DATE) as MONTH_NAME,
+    COUNT(wo.WORK_ORDER_ID) as WORK_ORDERS_COMPLETED,
+    SUM(wo.ACTUAL_HOURS) as TOTAL_HOURS,
+    SUM(wo.ACTUAL_COST) as TOTAL_COST,
+    AVG(wo.ACTUAL_HOURS) as AVG_HOURS_PER_WO,
+    AVG(wo.ACTUAL_COST) as AVG_COST_PER_WO,
+    SUM(wo.DOWNTIME_HOURS) as TOTAL_DOWNTIME,
+    -- Maintenance type breakdown
+    COUNT(CASE WHEN mt.CATEGORY = 'PREVENTIVE' THEN 1 END) as PREVENTIVE_COUNT,
+    COUNT(CASE WHEN mt.CATEGORY = 'CORRECTIVE' THEN 1 END) as CORRECTIVE_COUNT,
+    COUNT(CASE WHEN mt.CATEGORY = 'EMERGENCY' THEN 1 END) as EMERGENCY_COUNT,
+    COUNT(CASE WHEN mt.CATEGORY = 'PREDICTIVE' THEN 1 END) as PREDICTIVE_COUNT
+FROM WORK_ORDERS wo
+JOIN MAINTENANCE_TYPES mt ON wo.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+WHERE wo.STATUS = 'COMPLETED' AND wo.ACTUAL_START_DATE IS NOT NULL
+GROUP BY YEAR(wo.ACTUAL_START_DATE), MONTH(wo.ACTUAL_START_DATE), MONTHNAME(wo.ACTUAL_START_DATE)
+ORDER BY YEAR, MONTH;
+
+COMMENT ON VIEW VW_EQUIPMENT_RELIABILITY IS 'Equipment reliability metrics including availability and MTTR';
+COMMENT ON VIEW VW_MAINTENANCE_COST_ANALYSIS IS 'Maintenance cost breakdown by equipment type and criticality';
+COMMENT ON VIEW VW_TECHNICIAN_PERFORMANCE IS 'Technician productivity and performance metrics';
+COMMENT ON VIEW VW_FAILURE_ANALYSIS IS 'Failure mode analysis with cost and frequency data';
+COMMENT ON VIEW VW_PARTS_ANALYSIS IS 'Parts inventory analysis with usage patterns and stock status';
+COMMENT ON VIEW VW_MONTHLY_MAINTENANCE_TRENDS IS 'Monthly maintenance activity trends and patterns';

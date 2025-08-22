@@ -1,0 +1,413 @@
+-- =====================================================
+-- Industrial Maintenance Operations - Sample Analysis Queries
+-- Maintenance Operations Analytics and Reporting
+-- =====================================================
+
+USE DATABASE MAINTENANCE_OPERATIONS;
+USE SCHEMA OPERATIONS;
+
+-- =====================================================
+-- 1. HOW TO FIX STUFF - MAINTENANCE PROCEDURES & KNOWLEDGE
+-- =====================================================
+
+-- Q1.1: Find maintenance procedures for specific equipment types
+SELECT 
+    mp.PROCEDURE_NAME,
+    mp.EQUIPMENT_TYPE,
+    mt.TYPE_NAME as MAINTENANCE_TYPE,
+    mp.DESCRIPTION,
+    mp.ESTIMATED_DURATION_HOURS,
+    mp.SKILL_LEVEL_REQUIRED,
+    mp.TOOLS_REQUIRED,
+    mp.SAFETY_REQUIREMENTS
+FROM MAINTENANCE_PROCEDURES mp
+JOIN MAINTENANCE_TYPES mt ON mp.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+WHERE mp.EQUIPMENT_TYPE = 'Centrifugal Pump'
+ORDER BY mp.ESTIMATED_DURATION_HOURS;
+
+-- Q1.2: Find solutions for specific failure modes
+SELECT 
+    fc.FAILURE_DESCRIPTION,
+    fc.ROOT_CAUSE,
+    fc.RECOMMENDED_ACTION,
+    COUNT(wof.WORK_ORDER_ID) as TIMES_OCCURRED,
+    AVG(wo.ACTUAL_COST) as AVG_REPAIR_COST,
+    AVG(wo.ACTUAL_HOURS) as AVG_REPAIR_TIME
+FROM FAILURE_CODES fc
+LEFT JOIN WORK_ORDER_FAILURES wof ON fc.FAILURE_CODE = wof.FAILURE_CODE
+LEFT JOIN WORK_ORDERS wo ON wof.WORK_ORDER_ID = wo.WORK_ORDER_ID
+WHERE fc.FAILURE_CATEGORY = 'MECHANICAL'
+GROUP BY fc.FAILURE_CODE, fc.FAILURE_DESCRIPTION, fc.ROOT_CAUSE, fc.RECOMMENDED_ACTION
+ORDER BY TIMES_OCCURRED DESC;
+
+-- Q1.3: Get step-by-step maintenance instructions with parts needed
+SELECT 
+    mp.PROCEDURE_NAME,
+    mp.STEP_BY_STEP_INSTRUCTIONS,
+    mp.TOOLS_REQUIRED,
+    pi.PART_NAME,
+    pi.PART_NUMBER,
+    pi.UNIT_COST
+FROM MAINTENANCE_PROCEDURES mp
+CROSS JOIN PARTS_INVENTORY pi
+WHERE mp.EQUIPMENT_TYPE = 'Electric Motor' 
+  AND pi.CATEGORY IN ('Bearings', 'Electrical')
+ORDER BY mp.PROCEDURE_NAME, pi.UNIT_COST;
+
+-- Q1.4: Find similar past repairs for guidance
+SELECT 
+    wo.WORK_ORDER_ID,
+    e.EQUIPMENT_NAME,
+    e.EQUIPMENT_TYPE,
+    wo.DESCRIPTION,
+    wo.ACTUAL_HOURS,
+    wo.ACTUAL_COST,
+    fc.FAILURE_DESCRIPTION,
+    fc.RECOMMENDED_ACTION,
+    LISTAGG(DISTINCT (p.PART_NAME || ' (Qty: ' || wop.QUANTITY_USED || ')'), ', ') as PARTS_USED
+FROM WORK_ORDERS wo
+JOIN EQUIPMENT e ON wo.EQUIPMENT_ID = e.EQUIPMENT_ID
+LEFT JOIN WORK_ORDER_FAILURES wof ON wo.WORK_ORDER_ID = wof.WORK_ORDER_ID
+LEFT JOIN FAILURE_CODES fc ON wof.FAILURE_CODE = fc.FAILURE_CODE
+LEFT JOIN WORK_ORDER_PARTS wop ON wo.WORK_ORDER_ID = wop.WORK_ORDER_ID
+LEFT JOIN PARTS_INVENTORY p ON wop.PART_ID = p.PART_ID
+WHERE wo.STATUS = 'COMPLETED' 
+  AND e.EQUIPMENT_TYPE = 'Control Valve'
+  AND wo.DESCRIPTION ILIKE '%sticking%'
+GROUP BY wo.WORK_ORDER_ID, e.EQUIPMENT_NAME, e.EQUIPMENT_TYPE, wo.DESCRIPTION, 
+         wo.ACTUAL_HOURS, wo.ACTUAL_COST, fc.FAILURE_DESCRIPTION, fc.RECOMMENDED_ACTION
+ORDER BY wo.ACTUAL_END_DATE DESC;
+
+-- =====================================================
+-- 2. MAINTENANCE HISTORY - EQUIPMENT TRACKING & ANALYSIS
+-- =====================================================
+
+-- Q2.1: Complete maintenance history for specific equipment
+SELECT 
+    wo.WORK_ORDER_ID,
+    wo.REQUESTED_DATE,
+    wo.ACTUAL_START_DATE,
+    wo.ACTUAL_END_DATE,
+    mt.TYPE_NAME as MAINTENANCE_TYPE,
+    mt.CATEGORY,
+    wo.PRIORITY,
+    wo.STATUS,
+    wo.DESCRIPTION,
+    wo.ACTUAL_HOURS,
+    wo.ACTUAL_COST,
+    wo.DOWNTIME_HOURS,
+    t.FIRST_NAME || ' ' || t.LAST_NAME as LEAD_TECHNICIAN
+FROM WORK_ORDERS wo
+JOIN MAINTENANCE_TYPES mt ON wo.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+LEFT JOIN WORK_ORDER_ASSIGNMENTS woa ON wo.WORK_ORDER_ID = woa.WORK_ORDER_ID AND woa.ROLE = 'LEAD'
+LEFT JOIN TECHNICIANS t ON woa.TECHNICIAN_ID = t.TECHNICIAN_ID
+WHERE wo.EQUIPMENT_ID = 'EQ001'
+ORDER BY wo.ACTUAL_START_DATE DESC;
+
+-- Q2.2: Equipment reliability summary with failure patterns
+SELECT * FROM VW_EQUIPMENT_RELIABILITY
+WHERE EQUIPMENT_TYPE = 'Centrifugal Pump'
+ORDER BY TOTAL_DOWNTIME_HOURS DESC;
+
+-- Q2.3: Equipment nearing maintenance intervals (predictive scheduling)
+SELECT 
+    e.EQUIPMENT_ID,
+    e.EQUIPMENT_NAME,
+    e.EQUIPMENT_TYPE,
+    e.CRITICALITY_LEVEL,
+    MAX(wo.ACTUAL_END_DATE) as LAST_MAINTENANCE,
+    DATEDIFF('day', MAX(wo.ACTUAL_END_DATE), CURRENT_DATE()) as DAYS_SINCE_MAINTENANCE,
+    CASE 
+        WHEN e.EQUIPMENT_TYPE LIKE '%Pump%' AND DATEDIFF('day', MAX(wo.ACTUAL_END_DATE), CURRENT_DATE()) > 90 THEN 'OVERDUE'
+        WHEN e.EQUIPMENT_TYPE LIKE '%Pump%' AND DATEDIFF('day', MAX(wo.ACTUAL_END_DATE), CURRENT_DATE()) > 75 THEN 'DUE_SOON'
+        WHEN e.EQUIPMENT_TYPE LIKE '%Compressor%' AND DATEDIFF('day', MAX(wo.ACTUAL_END_DATE), CURRENT_DATE()) > 60 THEN 'OVERDUE'
+        WHEN e.EQUIPMENT_TYPE LIKE '%Compressor%' AND DATEDIFF('day', MAX(wo.ACTUAL_END_DATE), CURRENT_DATE()) > 45 THEN 'DUE_SOON'
+        ELSE 'CURRENT'
+    END as MAINTENANCE_STATUS
+FROM EQUIPMENT e
+LEFT JOIN WORK_ORDERS wo ON e.EQUIPMENT_ID = wo.EQUIPMENT_ID 
+    AND wo.STATUS = 'COMPLETED' 
+    AND mt.CATEGORY = 'PREVENTIVE'
+LEFT JOIN MAINTENANCE_TYPES mt ON wo.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+WHERE e.STATUS = 'ACTIVE'
+GROUP BY e.EQUIPMENT_ID, e.EQUIPMENT_NAME, e.EQUIPMENT_TYPE, e.CRITICALITY_LEVEL
+HAVING MAINTENANCE_STATUS IN ('OVERDUE', 'DUE_SOON')
+ORDER BY DAYS_SINCE_MAINTENANCE DESC;
+
+-- Q2.4: Top 10 most problematic equipment (high maintenance cost/frequency)
+SELECT 
+    e.EQUIPMENT_ID,
+    e.EQUIPMENT_NAME,
+    e.EQUIPMENT_TYPE,
+    e.CRITICALITY_LEVEL,
+    COUNT(wo.WORK_ORDER_ID) as TOTAL_WORK_ORDERS,
+    SUM(wo.ACTUAL_COST) as TOTAL_COST,
+    SUM(wo.DOWNTIME_HOURS) as TOTAL_DOWNTIME,
+    AVG(wo.ACTUAL_COST) as AVG_COST_PER_REPAIR,
+    -- Cost as percentage of replacement cost
+    SUM(wo.ACTUAL_COST) / NULLIF(e.REPLACEMENT_COST, 0) * 100 as COST_VS_REPLACEMENT_PERCENT
+FROM EQUIPMENT e
+JOIN WORK_ORDERS wo ON e.EQUIPMENT_ID = wo.EQUIPMENT_ID
+WHERE wo.STATUS = 'COMPLETED'
+GROUP BY e.EQUIPMENT_ID, e.EQUIPMENT_NAME, e.EQUIPMENT_TYPE, e.CRITICALITY_LEVEL, e.REPLACEMENT_COST
+ORDER BY TOTAL_COST DESC
+LIMIT 10;
+
+-- =====================================================
+-- 3. MAINTENANCE PRODUCTIVITY - TECHNICIAN & OPERATIONS ANALYSIS
+-- =====================================================
+
+-- Q3.1: Technician productivity analysis
+SELECT * FROM VW_TECHNICIAN_PERFORMANCE
+ORDER BY WORK_ORDERS_PER_WEEK DESC;
+
+-- Q3.2: Average repair times by maintenance type and technician skill level
+SELECT 
+    mt.TYPE_NAME,
+    mt.CATEGORY,
+    t.CERTIFICATION_LEVEL,
+    COUNT(wo.WORK_ORDER_ID) as WORK_ORDERS_COMPLETED,
+    AVG(wo.ACTUAL_HOURS) as AVG_ACTUAL_HOURS,
+    AVG(wo.ESTIMATED_HOURS) as AVG_ESTIMATED_HOURS,
+    AVG(wo.ACTUAL_HOURS) - AVG(wo.ESTIMATED_HOURS) as VARIANCE_HOURS,
+    -- Efficiency percentage (lower is better for time)
+    AVG(wo.ACTUAL_HOURS) / NULLIF(AVG(wo.ESTIMATED_HOURS), 0) * 100 as EFFICIENCY_PERCENT
+FROM WORK_ORDERS wo
+JOIN MAINTENANCE_TYPES mt ON wo.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+JOIN WORK_ORDER_ASSIGNMENTS woa ON wo.WORK_ORDER_ID = woa.WORK_ORDER_ID AND woa.ROLE = 'LEAD'
+JOIN TECHNICIANS t ON woa.TECHNICIAN_ID = t.TECHNICIAN_ID
+WHERE wo.STATUS = 'COMPLETED'
+GROUP BY mt.TYPE_NAME, mt.CATEGORY, t.CERTIFICATION_LEVEL
+ORDER BY EFFICIENCY_PERCENT;
+
+-- Q3.3: Work order completion rate and backlog analysis
+SELECT 
+    wo.STATUS,
+    COUNT(*) as COUNT,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as PERCENTAGE,
+    AVG(CASE WHEN wo.STATUS = 'COMPLETED' THEN DATEDIFF('hour', wo.REQUESTED_DATE, wo.ACTUAL_END_DATE) END) as AVG_COMPLETION_TIME_HOURS
+FROM WORK_ORDERS wo
+GROUP BY wo.STATUS
+ORDER BY COUNT DESC;
+
+-- Q3.4: Monthly productivity trends
+SELECT * FROM VW_MONTHLY_MAINTENANCE_TRENDS
+ORDER BY YEAR, MONTH;
+
+-- Q3.5: Parts usage efficiency and inventory turnover
+SELECT 
+    p.CATEGORY,
+    COUNT(DISTINCT p.PART_ID) as UNIQUE_PARTS,
+    SUM(p.QUANTITY_ON_HAND * p.UNIT_COST) as INVENTORY_VALUE,
+    SUM(wop.TOTAL_COST) as TOTAL_USAGE_COST,
+    -- Inventory turnover ratio
+    SUM(wop.TOTAL_COST) / NULLIF(SUM(p.QUANTITY_ON_HAND * p.UNIT_COST), 0) as TURNOVER_RATIO,
+    COUNT(CASE WHEN p.QUANTITY_ON_HAND <= p.REORDER_POINT THEN 1 END) as PARTS_TO_REORDER
+FROM PARTS_INVENTORY p
+LEFT JOIN WORK_ORDER_PARTS wop ON p.PART_ID = wop.PART_ID
+GROUP BY p.CATEGORY
+ORDER BY INVENTORY_VALUE DESC;
+
+-- =====================================================
+-- 4. ADVANCED ANALYTICS - KPIs AND TRENDS
+-- =====================================================
+
+-- Q4.1: Overall Equipment Effectiveness (OEE) calculation
+SELECT 
+    e.EQUIPMENT_TYPE,
+    COUNT(DISTINCT e.EQUIPMENT_ID) as EQUIPMENT_COUNT,
+    -- Availability calculation (simplified)
+    AVG(CASE 
+        WHEN SUM(wo.DOWNTIME_HOURS) IS NULL THEN 100
+        ELSE (8760 - COALESCE(SUM(wo.DOWNTIME_HOURS), 0)) / 8760 * 100 
+    END) as AVAILABILITY_PERCENT,
+    SUM(COALESCE(wo.DOWNTIME_HOURS, 0)) as TOTAL_DOWNTIME_HOURS,
+    SUM(COALESCE(wo.ACTUAL_COST, 0)) as TOTAL_MAINTENANCE_COST
+FROM EQUIPMENT e
+LEFT JOIN WORK_ORDERS wo ON e.EQUIPMENT_ID = wo.EQUIPMENT_ID AND wo.STATUS = 'COMPLETED'
+WHERE e.STATUS = 'ACTIVE'
+GROUP BY e.EQUIPMENT_TYPE
+ORDER BY AVAILABILITY_PERCENT DESC;
+
+-- Q4.2: Maintenance cost breakdown and trends
+SELECT * FROM VW_MAINTENANCE_COST_ANALYSIS
+ORDER BY TOTAL_COST DESC;
+
+-- Q4.3: Failure analysis - most common failure modes and their impact
+SELECT * FROM VW_FAILURE_ANALYSIS
+WHERE OCCURRENCE_COUNT > 0
+ORDER BY TOTAL_COST_IMPACT DESC;
+
+-- Q4.4: Preventive vs Reactive maintenance ratio
+SELECT 
+    YEAR(wo.ACTUAL_START_DATE) as YEAR,
+    MONTH(wo.ACTUAL_START_DATE) as MONTH,
+    COUNT(CASE WHEN mt.CATEGORY = 'PREVENTIVE' THEN 1 END) as PREVENTIVE_COUNT,
+    COUNT(CASE WHEN mt.CATEGORY IN ('CORRECTIVE', 'EMERGENCY') THEN 1 END) as REACTIVE_COUNT,
+    COUNT(CASE WHEN mt.CATEGORY = 'PREVENTIVE' THEN 1 END) / 
+        NULLIF(COUNT(CASE WHEN mt.CATEGORY IN ('CORRECTIVE', 'EMERGENCY') THEN 1 END), 0) as PREVENTIVE_TO_REACTIVE_RATIO,
+    -- Cost comparison
+    SUM(CASE WHEN mt.CATEGORY = 'PREVENTIVE' THEN wo.ACTUAL_COST ELSE 0 END) as PREVENTIVE_COST,
+    SUM(CASE WHEN mt.CATEGORY IN ('CORRECTIVE', 'EMERGENCY') THEN wo.ACTUAL_COST ELSE 0 END) as REACTIVE_COST
+FROM WORK_ORDERS wo
+JOIN MAINTENANCE_TYPES mt ON wo.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+WHERE wo.STATUS = 'COMPLETED' AND wo.ACTUAL_START_DATE IS NOT NULL
+GROUP BY YEAR(wo.ACTUAL_START_DATE), MONTH(wo.ACTUAL_START_DATE)
+ORDER BY YEAR, MONTH;
+
+-- Q4.5: Work order priority distribution and response times
+SELECT 
+    wo.PRIORITY,
+    COUNT(*) as WORK_ORDER_COUNT,
+    AVG(DATEDIFF('hour', wo.REQUESTED_DATE, wo.ACTUAL_START_DATE)) as AVG_RESPONSE_TIME_HOURS,
+    AVG(wo.ACTUAL_HOURS) as AVG_COMPLETION_TIME_HOURS,
+    AVG(wo.ACTUAL_COST) as AVG_COST,
+    SUM(wo.DOWNTIME_HOURS) as TOTAL_DOWNTIME_HOURS
+FROM WORK_ORDERS wo
+WHERE wo.STATUS = 'COMPLETED'
+GROUP BY wo.PRIORITY
+ORDER BY 
+    CASE wo.PRIORITY 
+        WHEN 'EMERGENCY' THEN 1 
+        WHEN 'HIGH' THEN 2 
+        WHEN 'MEDIUM' THEN 3 
+        WHEN 'LOW' THEN 4 
+    END;
+
+-- =====================================================
+-- 5. OPERATIONAL DASHBOARDS - CURRENT STATUS QUERIES
+-- =====================================================
+
+-- Q5.1: Current work order status (dashboard view)
+SELECT 
+    'Active Work Orders' as METRIC,
+    COUNT(CASE WHEN STATUS IN ('OPEN', 'IN_PROGRESS') THEN 1 END) as CURRENT_VALUE,
+    COUNT(CASE WHEN STATUS = 'COMPLETED' THEN 1 END) as COMPLETED_THIS_MONTH,
+    COUNT(*) as TOTAL_THIS_MONTH
+FROM WORK_ORDERS
+WHERE MONTH(REQUESTED_DATE) = MONTH(CURRENT_DATE())
+UNION ALL
+SELECT 
+    'Emergency Work Orders',
+    COUNT(CASE WHEN STATUS IN ('OPEN', 'IN_PROGRESS') AND PRIORITY = 'EMERGENCY' THEN 1 END),
+    COUNT(CASE WHEN STATUS = 'COMPLETED' AND PRIORITY = 'EMERGENCY' THEN 1 END),
+    COUNT(CASE WHEN PRIORITY = 'EMERGENCY' THEN 1 END)
+FROM WORK_ORDERS
+WHERE MONTH(REQUESTED_DATE) = MONTH(CURRENT_DATE());
+
+-- Q5.2: Equipment requiring immediate attention
+SELECT 
+    e.EQUIPMENT_ID,
+    e.EQUIPMENT_NAME,
+    e.CRITICALITY_LEVEL,
+    wo.PRIORITY,
+    wo.STATUS,
+    wo.DESCRIPTION,
+    wo.SCHEDULED_START_DATE,
+    DATEDIFF('hour', CURRENT_TIMESTAMP(), wo.SCHEDULED_START_DATE) as HOURS_TO_SCHEDULED_START
+FROM EQUIPMENT e
+JOIN WORK_ORDERS wo ON e.EQUIPMENT_ID = wo.EQUIPMENT_ID
+WHERE wo.STATUS IN ('OPEN', 'IN_PROGRESS')
+  AND (wo.PRIORITY IN ('EMERGENCY', 'HIGH') OR e.CRITICALITY_LEVEL = 'HIGH')
+ORDER BY 
+    CASE wo.PRIORITY WHEN 'EMERGENCY' THEN 1 WHEN 'HIGH' THEN 2 ELSE 3 END,
+    wo.SCHEDULED_START_DATE;
+
+-- Q5.3: Parts inventory status requiring attention
+SELECT * FROM VW_PARTS_ANALYSIS
+WHERE STOCK_STATUS IN ('REORDER_REQUIRED', 'LOW_STOCK')
+ORDER BY 
+    CASE STOCK_STATUS WHEN 'REORDER_REQUIRED' THEN 1 ELSE 2 END,
+    MONTHS_OF_STOCK;
+
+-- Q5.4: Technician workload distribution
+SELECT 
+    t.TECHNICIAN_ID,
+    t.FIRST_NAME || ' ' || t.LAST_NAME as TECHNICIAN_NAME,
+    t.SPECIALIZATION,
+    COUNT(CASE WHEN wo.STATUS IN ('OPEN', 'IN_PROGRESS') THEN 1 END) as ACTIVE_WORK_ORDERS,
+    SUM(CASE WHEN wo.STATUS IN ('OPEN', 'IN_PROGRESS') THEN wo.ESTIMATED_HOURS ELSE 0 END) as ESTIMATED_HOURS_REMAINING,
+    AVG(tp.WORK_ORDERS_PER_WEEK) as TYPICAL_WEEKLY_CAPACITY
+FROM TECHNICIANS t
+LEFT JOIN WORK_ORDER_ASSIGNMENTS woa ON t.TECHNICIAN_ID = woa.TECHNICIAN_ID
+LEFT JOIN WORK_ORDERS wo ON woa.WORK_ORDER_ID = wo.WORK_ORDER_ID
+LEFT JOIN VW_TECHNICIAN_PERFORMANCE tp ON t.TECHNICIAN_ID = tp.TECHNICIAN_ID
+WHERE t.STATUS = 'ACTIVE'
+GROUP BY t.TECHNICIAN_ID, t.FIRST_NAME, t.LAST_NAME, t.SPECIALIZATION, tp.WORK_ORDERS_PER_WEEK
+ORDER BY ESTIMATED_HOURS_REMAINING DESC;
+
+-- =====================================================
+-- 6. BUSINESS INTELLIGENCE QUERIES
+-- =====================================================
+
+-- Q6.1: ROI analysis - preventive vs reactive maintenance costs
+WITH maintenance_costs AS (
+    SELECT 
+        CASE WHEN mt.CATEGORY = 'PREVENTIVE' THEN 'PREVENTIVE' ELSE 'REACTIVE' END as MAINTENANCE_STRATEGY,
+        SUM(wo.ACTUAL_COST) as TOTAL_COST,
+        SUM(wo.DOWNTIME_HOURS) as TOTAL_DOWNTIME,
+        COUNT(wo.WORK_ORDER_ID) as WORK_ORDER_COUNT
+    FROM WORK_ORDERS wo
+    JOIN MAINTENANCE_TYPES mt ON wo.MAINTENANCE_TYPE_ID = mt.MAINTENANCE_TYPE_ID
+    WHERE wo.STATUS = 'COMPLETED'
+    GROUP BY CASE WHEN mt.CATEGORY = 'PREVENTIVE' THEN 'PREVENTIVE' ELSE 'REACTIVE' END
+)
+SELECT 
+    *,
+    TOTAL_COST / WORK_ORDER_COUNT as COST_PER_WORK_ORDER,
+    TOTAL_DOWNTIME / WORK_ORDER_COUNT as DOWNTIME_PER_WORK_ORDER,
+    -- Assuming $1000/hour downtime cost
+    (TOTAL_COST + (TOTAL_DOWNTIME * 1000)) as TOTAL_BUSINESS_IMPACT
+FROM maintenance_costs;
+
+-- Q6.2: Equipment lifecycle cost analysis
+SELECT 
+    e.EQUIPMENT_TYPE,
+    AVG(EQUIPMENT_AGE_YEARS(e.INSTALLATION_DATE)) as AVG_AGE_YEARS,
+    AVG(e.REPLACEMENT_COST) as AVG_REPLACEMENT_COST,
+    AVG(SUM(wo.ACTUAL_COST)) as AVG_MAINTENANCE_COST_TO_DATE,
+    AVG(SUM(wo.ACTUAL_COST)) / AVG(e.REPLACEMENT_COST) * 100 as MAINTENANCE_VS_REPLACEMENT_PERCENT
+FROM EQUIPMENT e
+LEFT JOIN WORK_ORDERS wo ON e.EQUIPMENT_ID = wo.EQUIPMENT_ID AND wo.STATUS = 'COMPLETED'
+GROUP BY e.EQUIPMENT_TYPE, e.EQUIPMENT_ID, e.INSTALLATION_DATE, e.REPLACEMENT_COST
+GROUP BY e.EQUIPMENT_TYPE
+HAVING AVG_AGE_YEARS > 1 -- Only include equipment with significant age
+ORDER BY MAINTENANCE_VS_REPLACEMENT_PERCENT DESC;
+
+COMMENT ON FILE IS 'Comprehensive sample queries demonstrating maintenance operations analytics capabilities including equipment history, technician productivity, failure analysis, and business intelligence reporting';
+
+-- =====================================================
+-- QUERY EXECUTION NOTES
+-- =====================================================
+/*
+These queries demonstrate:
+
+1. TROUBLESHOOTING SUPPORT:
+   - Finding maintenance procedures and historical solutions
+   - Failure mode analysis and recommended actions
+   - Parts requirements and repair guidance
+
+2. MAINTENANCE HISTORY:
+   - Complete equipment maintenance records
+   - Reliability metrics and failure patterns
+   - Predictive maintenance scheduling
+
+3. PRODUCTIVITY ANALYSIS:
+   - Technician performance metrics
+   - Work order completion efficiency
+   - Resource utilization analysis
+
+4. BUSINESS INTELLIGENCE:
+   - Cost analysis and ROI calculations
+   - Equipment lifecycle management
+   - Preventive vs reactive maintenance comparison
+
+To run these queries:
+1. Execute the schema and data scripts first
+2. Run individual queries or sections as needed
+3. Modify date ranges and filters for your specific analysis requirements
+4. Use the views for simplified recurring analysis
+
+Expected query performance: Most queries should complete in <1 second with this dataset size.
+For larger datasets, consider adding indexes on frequently queried date and status columns.
+*/
