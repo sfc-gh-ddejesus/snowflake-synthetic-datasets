@@ -1,0 +1,19 @@
+# SQL files should be recognized as SQL
+*.sql linguist-language=SQL
+
+# Documentation files
+*.md linguist-documentation=true
+
+# Generated files (if any) should be excluded from language stats
+*.log linguist-generated=true
+*.tmp linguist-generated=true
+
+# Mark SQL as the primary language for this repository
+* linguist-language=SQL
+
+# Override for specific file types that should be recognized correctly
+*.md linguist-language=Markdown
+*.sql linguist-language=SQL
+
+# Ensure SQL files are highlighted and counted in language statistics
+*.sql linguist-detectable=true
